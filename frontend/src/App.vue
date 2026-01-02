@@ -69,8 +69,8 @@
       </div>
     </main>
     <footer class="footer">
-      <p>&copy; 2024 タスク管理アプリ</p>
       <span class="version">β0.1.0</span>
+      <span class="current-time">{{ currentTime }}</span>
     </footer>
   </div>
 </template>
@@ -96,6 +96,21 @@ const getUrlUser = (): string | null => {
 
 const currentUser = ref<string | null>(getUrlUser())
 const hasUser = computed(() => currentUser.value !== null)
+const currentTime = ref<string>('')
+
+// 現在時刻を更新
+const updateTime = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  const seconds = String(now.getSeconds()).padStart(2, '0')
+  currentTime.value = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`
+}
+
+let timeInterval: number | null = null
 
 // URLパラメータを維持しながらビューを切り替え
 const switchView = (view: ViewType) => {
@@ -158,10 +173,18 @@ const handleClickOutside = (event: MouseEvent) => {
 
     // クリックイベントリスナーを追加
     document.addEventListener('click', handleClickOutside)
+
+    // 現在時刻を更新（初回）
+    updateTime()
+    // 1秒ごとに現在時刻を更新
+    timeInterval = window.setInterval(updateTime, 1000)
   })
 
   onUnmounted(() => {
     document.removeEventListener('click', handleClickOutside)
+    if (timeInterval !== null) {
+      clearInterval(timeInterval)
+    }
   })
 
 // ユーザー名が変更されたらURLを更新
@@ -420,13 +443,15 @@ watch(currentUser, (newUser: string | null) => {
   color: var(--current-textSecondary);
   font-size: 0.875rem;
 
-  p {
-    margin: 0;
-  }
-
   .version {
     font-size: 0.875rem;
     opacity: 0.7;
+  }
+
+  .current-time {
+    font-size: 0.875rem;
+    font-family: 'Courier New', monospace;
+    opacity: 0.8;
   }
 }
 
