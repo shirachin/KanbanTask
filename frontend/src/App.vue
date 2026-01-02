@@ -5,12 +5,44 @@
     </header>
     <nav class="nav">
       <ul class="nav-list">
-        <li><a href="#" class="nav-link">ダッシュボード</a></li>
-        <li><a href="#" class="nav-link">カンバンボード</a></li>
+        <li>
+          <a 
+            href="#" 
+            class="nav-link" 
+            :class="{ active: currentView === 'dashboard' }"
+            @click.prevent="switchView('dashboard')"
+          >
+            ダッシュボード
+          </a>
+        </li>
+        <li>
+          <a 
+            href="#" 
+            class="nav-link" 
+            :class="{ active: currentView === 'kanban' }"
+            @click.prevent="switchView('kanban')"
+          >
+            カンバンボード
+          </a>
+        </li>
+        <li>
+          <a 
+            href="#" 
+            class="nav-link" 
+            :class="{ active: currentView === 'color-palette' }"
+            @click.prevent="switchView('color-palette')"
+          >
+            色見本
+          </a>
+        </li>
       </ul>
     </nav>
     <main class="main">
-      <Dashboard />
+      <Dashboard v-if="currentView === 'dashboard'" />
+      <ColorPalette v-else-if="currentView === 'color-palette'" />
+      <div v-else-if="currentView === 'kanban'" class="placeholder">
+        <p>カンバンボード（準備中）</p>
+      </div>
     </main>
     <footer class="footer">
       <p>&copy; 2024 タスク管理アプリ</p>
@@ -19,7 +51,17 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import Dashboard from './views/Dashboard.vue'
+import ColorPalette from './views/ColorPalette.vue'
+
+type ViewType = 'dashboard' | 'kanban' | 'color-palette'
+
+const currentView = ref<ViewType>('dashboard')
+
+const switchView = (view: ViewType) => {
+  currentView.value = view
+}
 </script>
 
 <style lang="scss" scoped>
@@ -101,5 +143,14 @@ import Dashboard from './views/Dashboard.vue'
   p {
     margin: 0;
   }
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: $text-secondary;
+  font-size: 1.2rem;
 }
 </style>
