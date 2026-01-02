@@ -59,6 +59,7 @@
     </main>
     <footer class="footer">
       <p>&copy; 2024 タスク管理アプリ</p>
+      <span class="version">β0.1.0</span>
     </footer>
   </div>
 </template>
@@ -88,7 +89,7 @@ const toggleNav = () => {
 @import './styles/_theme';
 
 .app {
-  min-height: 100vh;
+  height: 100vh;
   width: 100%;
   display: grid;
   grid-template-areas:
@@ -98,6 +99,7 @@ const toggleNav = () => {
   grid-template-columns: 200px 1fr;
   grid-template-rows: auto 1fr auto;
   transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .app.nav-collapsed {
@@ -106,9 +108,12 @@ const toggleNav = () => {
 
 .header {
   grid-area: header;
+  position: sticky;
+  top: 0;
+  z-index: 100;
   background: linear-gradient(135deg, var(--theme-gradient-start, $primary-gradient-start) 0%, var(--theme-gradient-end, $primary-gradient-end) 100%);
   color: $text-white;
-  padding: 1.5rem 2rem;
+  padding: 0.75rem 1.5rem;
   box-shadow: $shadow-sm;
 }
 
@@ -170,9 +175,11 @@ const toggleNav = () => {
   background: $background-gray;
   border-right: 1px solid $border-color;
   padding: 1rem 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   width: 200px;
   min-width: 200px;
+  height: 100%;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   transform: translateX(0);
 
@@ -209,6 +216,8 @@ const toggleNav = () => {
   grid-area: main;
   padding: 2rem;
   overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
   background: $background-light;
 }
 
@@ -216,13 +225,20 @@ const toggleNav = () => {
   grid-area: footer;
   background: $background-gray;
   border-top: 1px solid $border-color;
-  padding: 1rem 2rem;
-  text-align: center;
+  padding: 0.5rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   color: $text-secondary;
   font-size: 0.875rem;
 
   p {
     margin: 0;
+  }
+
+  .version {
+    font-size: 0.875rem;
+    opacity: 0.7;
   }
 }
 
