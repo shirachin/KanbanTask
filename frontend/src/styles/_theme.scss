@@ -1,0 +1,28 @@
+@import './_color';
+
+// テーマ設定
+$themes: (
+  "primary": (
+    "name": "Primary",
+    "color": $primary-color,
+  ),
+  "secondary": (
+    "name": "Secondary",
+    "color": calc-color-secondary(50),
+  ),
+);
+
+// 現在のテーマを取得する関数
+@function get-theme-color($theme-name: "primary") {
+  $theme: map-get($themes, $theme-name);
+  @if $theme {
+    @return map-get($theme, "color");
+  }
+  @return $primary-color; // デフォルト
+}
+
+// テーマカラー変数
+$theme-color: get-theme-color("primary");
+$theme-hover: calc-color-primary(49);
+$theme-gradient-start: calc-color-primary(52);
+$theme-gradient-end: calc-color-primary(48);

@@ -1,7 +1,10 @@
 <template>
   <div class="app">
     <header class="header">
-      <h1>タスク管理アプリ</h1>
+      <div class="header-content">
+        <h1>タスク管理アプリ</h1>
+        <ThemeSelector />
+      </div>
     </header>
     <nav class="nav">
       <ul class="nav-list">
@@ -54,6 +57,7 @@
 import { ref } from 'vue'
 import Dashboard from './views/Dashboard.vue'
 import ColorPalette from './views/ColorPalette.vue'
+import ThemeSelector from './components/ThemeSelector.vue'
 
 type ViewType = 'dashboard' | 'kanban' | 'color-palette'
 
@@ -66,6 +70,7 @@ const switchView = (view: ViewType) => {
 
 <style lang="scss" scoped>
 @import './styles/_color';
+@import './styles/_theme';
 
 .app {
   min-height: 100vh;
@@ -81,10 +86,17 @@ const switchView = (view: ViewType) => {
 
 .header {
   grid-area: header;
-  background: linear-gradient(135deg, $primary-gradient-start 0%, $primary-gradient-end 100%);
+  background: linear-gradient(135deg, var(--theme-gradient-start, $primary-gradient-start) 0%, var(--theme-gradient-end, $primary-gradient-end) 100%);
   color: $text-white;
   padding: 1.5rem 2rem;
   box-shadow: $shadow-sm;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
 
   h1 {
     margin: 0;
@@ -119,7 +131,7 @@ const switchView = (view: ViewType) => {
 
   &:active,
   &.active {
-    background-color: $primary-color;
+    background-color: var(--theme-color, $primary-color);
     color: $text-white;
   }
 }

@@ -44,7 +44,7 @@ a {
 
 @media (prefers-color-scheme: light) {
   :root {
-    color: #213547;
+    color: $text-primary;
     background-color: $background-light;
   }
 

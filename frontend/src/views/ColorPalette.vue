@@ -2,530 +2,215 @@
   <div class="color-palette">
     <div class="palette-header">
       <h2>カラーパレット</h2>
-      <p>アプリケーションで使用されている色の一覧です</p>
+      <p>基準色から生成されたグラデーションを表示します</p>
     </div>
 
     <div class="palette-content">
-      <!-- 設定値表示 -->
       <section class="color-section">
-        <h3>カラー設定値</h3>
-        <div class="config-grid">
+        <h3>カラーグラデーション</h3>
+        <div 
+          class="gradient-grid" 
+          :style="{ gridTemplateColumns: `150px repeat(${colorNames.length}, 1fr)` }"
+        >
+          <!-- ヘッダー行 -->
+          <div class="gradient-header">
+            <div class="header-label">段階</div>
+          </div>
           <div 
-            v-for="config in colorConfigs" 
-            :key="config.name"
-            class="config-card"
+            v-for="colorName in colorNames" 
+            :key="`header-${colorName}`"
+            class="gradient-header"
           >
-            <div class="config-header">{{ config.label }}</div>
-            <div class="config-content">
-              <div class="config-item">
-                <span class="config-label">色相 (Hue):</span>
-                <span class="config-value">{{ config.hueRaw }}</span>
+            <div class="header-label">{{ colorName.charAt(0).toUpperCase() + colorName.slice(1) }}色</div>
+          </div>
+
+          <!-- データ行 -->
+          <template v-if="colorNames.length > 0 && colorScales[colorNames[0]]">
+            <template v-for="(step, index) in colorScales[colorNames[0]]" :key="`row-${index}`">
+              <!-- 段階番号 -->
+              <div class="gradient-step-cell" :class="{ 'base-color': step.level === 50 }">
+                <div class="step-number">{{ step.level }}</div>
               </div>
-              <div class="config-item">
-                <span class="config-label">彩度 (Chroma):</span>
-                <span class="config-value">{{ config.chromaRaw }}</span>
+              <!-- 各色のスウォッチ -->
+              <div 
+                v-for="colorName in colorNames" 
+                :key="`${colorName}-${index}`"
+                class="gradient-swatch-cell"
+              >
+                <div 
+                  v-if="colorScales[colorName] && colorScales[colorName][index]"
+                  class="gradient-swatch" 
+                  :class="{ 'base-color-swatch': colorScales[colorName][index]?.level === 50 }"
+                  :style="{ background: colorScales[colorName][index]?.color }"
+                  @mouseenter="showTooltip($event, colorScales[colorName][index])"
+                  @mouseleave="hideTooltip"
+                ></div>
               </div>
-              <div class="config-item">
-                <span class="config-label">明度段階:</span>
-                <span class="config-value">0.0 ～ 1.0 (0.1刻み)</span>
-              </div>
-              <div class="config-item">
-                <span class="config-label">SCSS変数:</span>
-                <span class="config-value code">$hue-{{ config.name }}: {{ config.hueRaw }};<br>$chroma-{{ config.name }}: {{ config.chromaRaw }};</span>
-              </div>
-            </div>
-          </div>
+            </template>
+          </template>
         </div>
       </section>
+    </div>
 
-      <!-- 11段階の色スケール（5色相を横並び） -->
-      <section class="color-section">
-        <h3>カラースケール（11段階）</h3>
-        <div class="color-scale-grid">
-          <!-- 行ヘッダー列 -->
-          <div class="scale-row-header-column">
-            <div class="scale-column-header"></div>
-            <div 
-              v-for="i in 11" 
-              :key="`row-header-${i - 1}`"
-              class="scale-row-header"
-            >
-              {{ i - 1 }}
-            </div>
-          </div>
-
-          <!-- プライマリカラー列 -->
-          <div class="scale-column">
-            <div class="scale-column-header">プライマリ</div>
-            <div 
-              v-for="i in 11" 
-              :key="`primary-${i - 1}`"
-              class="scale-cell"
-            >
-              <div 
-                class="scale-swatch" 
-                :style="{ background: $primaryScale[i - 1] }"
-              ></div>
-            </div>
-          </div>
-
-          <!-- セカンダリカラー列 -->
-          <div class="scale-column">
-            <div class="scale-column-header">セカンダリ</div>
-            <div 
-              v-for="i in 11" 
-              :key="`secondary-${i - 1}`"
-              class="scale-cell"
-            >
-              <div 
-                class="scale-swatch" 
-                :style="{ background: $secondaryScale[i - 1] }"
-              ></div>
-            </div>
-          </div>
-
-          <!-- 成功カラー列 -->
-          <div class="scale-column">
-            <div class="scale-column-header">成功</div>
-            <div 
-              v-for="i in 11" 
-              :key="`success-${i - 1}`"
-              class="scale-cell"
-            >
-              <div 
-                class="scale-swatch" 
-                :style="{ background: $successScale[i - 1] }"
-              ></div>
-            </div>
-          </div>
-
-          <!-- 危険カラー列 -->
-          <div class="scale-column">
-            <div class="scale-column-header">危険</div>
-            <div 
-              v-for="i in 11" 
-              :key="`danger-${i - 1}`"
-              class="scale-cell"
-            >
-              <div 
-                class="scale-swatch" 
-                :style="{ background: $dangerScale[i - 1] }"
-              ></div>
-            </div>
-          </div>
-
-          <!-- ニュートラルカラー列 -->
-          <div class="scale-column">
-            <div class="scale-column-header">ニュートラル</div>
-            <div 
-              v-for="i in 11" 
-              :key="`neutral-${i - 1}`"
-              class="scale-cell"
-            >
-              <div 
-                class="scale-swatch" 
-                :style="{ background: $neutralScale[i - 1], border: i === 11 ? `1px solid ${$borderColor}` : 'none' }"
-              ></div>
-            </div>
-          </div>
+    <!-- ツールチップ -->
+    <div 
+      v-if="tooltip.visible"
+      class="tooltip"
+      :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }"
+    >
+      <div class="tooltip-content">
+        <div class="tooltip-item">
+          <span class="tooltip-label">oklch値:</span>
+          <span class="tooltip-value code">{{ tooltip.oklch }}</span>
         </div>
-      </section>
-
-      <!-- プライマリカラー -->
-      <section class="color-section">
-        <h3>プライマリカラー</h3>
-        <div class="color-grid">
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $primaryColor }"></div>
-            <div class="color-info">
-              <div class="color-name">primary-color</div>
-              <div class="color-value">{{ $primaryColor }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $primaryHover }"></div>
-            <div class="color-info">
-              <div class="color-name">primary-hover</div>
-              <div class="color-value">{{ $primaryHover }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch gradient" :style="{ background: `linear-gradient(135deg, ${$primaryGradientStart} 0%, ${$primaryGradientEnd} 100%)` }"></div>
-            <div class="color-info">
-              <div class="color-name">primary-gradient</div>
-              <div class="color-value">{{ $primaryGradientStart }} → {{ $primaryGradientEnd }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- セカンダリカラー -->
-      <section class="color-section">
-        <h3>セカンダリカラー</h3>
-        <div class="color-grid">
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $secondaryColor }"></div>
-            <div class="color-info">
-              <div class="color-name">secondary-color</div>
-              <div class="color-value">{{ $secondaryColor }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $secondaryHover }"></div>
-            <div class="color-info">
-              <div class="color-name">secondary-hover</div>
-              <div class="color-value">{{ $secondaryHover }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 成功カラー -->
-      <section class="color-section">
-        <h3>成功カラー</h3>
-        <div class="color-grid">
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $successColor }"></div>
-            <div class="color-info">
-              <div class="color-name">success-color</div>
-              <div class="color-value">{{ $successColor }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $successHover }"></div>
-            <div class="color-info">
-              <div class="color-name">success-hover</div>
-              <div class="color-value">{{ $successHover }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 危険カラー -->
-      <section class="color-section">
-        <h3>危険カラー</h3>
-        <div class="color-grid">
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $dangerColor }"></div>
-            <div class="color-info">
-              <div class="color-name">danger-color</div>
-              <div class="color-value">{{ $dangerColor }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $dangerHover }"></div>
-            <div class="color-info">
-              <div class="color-name">danger-hover</div>
-              <div class="color-value">{{ $dangerHover }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 背景色 -->
-      <section class="color-section">
-        <h3>背景色</h3>
-        <div class="color-grid">
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $backgroundDark }"></div>
-            <div class="color-info">
-              <div class="color-name">background-dark</div>
-              <div class="color-value">{{ $backgroundDark }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $backgroundLight, border: `1px solid ${$borderColor}` }"></div>
-            <div class="color-info">
-              <div class="color-name">background-light</div>
-              <div class="color-value">{{ $backgroundLight }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $backgroundGray }"></div>
-            <div class="color-info">
-              <div class="color-name">background-gray</div>
-              <div class="color-value">{{ $backgroundGray }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $backgroundGrayHover }"></div>
-            <div class="color-info">
-              <div class="color-name">background-gray-hover</div>
-              <div class="color-value">{{ $backgroundGrayHover }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- テキスト色 -->
-      <section class="color-section">
-        <h3>テキスト色</h3>
-        <div class="color-grid">
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $textPrimary }"></div>
-            <div class="color-info">
-              <div class="color-name">text-primary</div>
-              <div class="color-value">{{ $textPrimary }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $textSecondary }"></div>
-            <div class="color-info">
-              <div class="color-name">text-secondary</div>
-              <div class="color-value">{{ $textSecondary }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $textTertiary }"></div>
-            <div class="color-info">
-              <div class="color-name">text-tertiary</div>
-              <div class="color-value">{{ $textTertiary }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $textWhite }"></div>
-            <div class="color-info">
-              <div class="color-name">text-white</div>
-              <div class="color-value">{{ $textWhite }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ボーダー色 -->
-      <section class="color-section">
-        <h3>ボーダー色</h3>
-        <div class="color-grid">
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $borderColor }"></div>
-            <div class="color-info">
-              <div class="color-name">border-color</div>
-              <div class="color-value">{{ $borderColor }}</div>
-            </div>
-          </div>
-          <div class="color-item">
-            <div class="color-swatch" :style="{ background: $borderLight }"></div>
-            <div class="color-info">
-              <div class="color-name">border-light</div>
-              <div class="color-value">{{ $borderLight }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- シャドウ -->
-      <section class="color-section">
-        <h3>シャドウ</h3>
-        <div class="shadow-grid">
-          <div class="shadow-item">
-            <div class="shadow-demo" :style="{ boxShadow: $shadowSm }">
-              <div class="shadow-label">shadow-sm</div>
-            </div>
-            <div class="shadow-value">{{ $shadowSm }}</div>
-          </div>
-          <div class="shadow-item">
-            <div class="shadow-demo" :style="{ boxShadow: $shadowMd }">
-              <div class="shadow-label">shadow-md</div>
-            </div>
-            <div class="shadow-value">{{ $shadowMd }}</div>
-          </div>
-          <div class="shadow-item">
-            <div class="shadow-demo" :style="{ boxShadow: $shadowLg }">
-              <div class="shadow-label">shadow-lg</div>
-            </div>
-            <div class="shadow-value">{{ $shadowLg }}</div>
-          </div>
-          <div class="shadow-item">
-            <div class="shadow-demo" :style="{ boxShadow: $shadowPrimary }">
-              <div class="shadow-label">shadow-primary</div>
-            </div>
-            <div class="shadow-value">{{ $shadowPrimary }}</div>
-          </div>
-          <div class="shadow-item">
-            <div class="shadow-demo" :style="{ boxShadow: $shadowPrimarySm }">
-              <div class="shadow-label">shadow-primary-sm</div>
-            </div>
-            <div class="shadow-value">{{ $shadowPrimarySm }}</div>
-          </div>
-        </div>
-      </section>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 
 // CSS変数から値を取得
 const getCSSVariable = (name: string) => {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-// 数値として取得（degや単位を除去）
-const getCSSVariableNumber = (name: string) => {
-  const value = getCSSVariable(name)
-  return parseFloat(value.replace(/deg|%|px/g, ''))
+// 明度レベル範囲の設定（表示用）
+const levelStart = 0
+const levelStop = 100
+const levelStep = 10
+
+// oklch値からパラメータを抽出
+const parseOklch = (oklchValue: string): { l: number; c: number; h: number } => {
+  // oklch(0.81 0.135 260deg) の形式から値を抽出
+  const match = oklchValue.match(/oklch\(([\d.]+)\s+([\d.]+)\s+([\d.]+)deg\)/)
+  if (match) {
+    return {
+      l: parseFloat(match[1]),
+      c: parseFloat(match[2]),
+      h: parseFloat(match[3]),
+    }
+  }
+  // フォールバック（パースに失敗した場合）
+  return { l: 0, c: 0, h: 0 }
 }
 
-// プライマリカラー
-const $primaryColor = computed(() => getCSSVariable('--primary-color'))
-const $primaryHover = computed(() => getCSSVariable('--primary-hover'))
-const $primaryGradientStart = computed(() => getCSSVariable('--primary-gradient-start'))
-const $primaryGradientEnd = computed(() => getCSSVariable('--primary-gradient-end'))
+// CSS変数から利用可能な色名を動的に取得
+const getAvailableColorNames = (): string[] => {
+  const colorNameSet = new Set<string>()
+  
+  // すべてのCSS変数を取得
+  Array.from(document.styleSheets).forEach(sheet => {
+    try {
+      Array.from(sheet.cssRules).forEach(rule => {
+        if (rule instanceof CSSStyleRule && rule.selectorText === ':root') {
+          Array.from(rule.style).forEach(prop => {
+            // --base-{colorName}-hue のパターンを検索
+            const match = prop.match(/^--base-([^-]+)-hue$/)
+            if (match) {
+              colorNameSet.add(match[1])
+            }
+          })
+        }
+      })
+    } catch {
+      // クロスオリジンのスタイルシートは無視
+    }
+  })
+  
+  return Array.from(colorNameSet).sort()
+}
 
-// セカンダリカラー
-const $secondaryColor = computed(() => getCSSVariable('--secondary-color'))
-const $secondaryHover = computed(() => getCSSVariable('--secondary-hover'))
+// 色スケールを計算する共通関数
+const calculateColorScale = (colorName: string) => {
+  const steps = []
+  
+  // レベル範囲をループ（startからstopまで、step刻み）
+  for (let level = levelStart; level <= levelStop; level += levelStep) {
+    // レベル値をそのままCSS変数名に使用（0~100の範囲）
+    const color = getCSSVariable(`--${colorName}-${level}`)
+    
+    // 空の場合はスキップ
+    if (!color) continue
+    
+    // SCSSで計算されたoklch値からパラメータを抽出
+    const { l, c, h } = parseOklch(color)
+    
+    steps.push({
+      level,
+      color,
+      l,
+      c,
+      h,
+    })
+  }
+  
+  // 最後のステップがlevelStopに到達していない場合、明示的に追加
+  const lastLevel = steps.length > 0 ? steps[steps.length - 1].level : levelStart
+  if (lastLevel < levelStop) {
+    const color = getCSSVariable(`--${colorName}-${levelStop}`)
+    if (color) {
+      const { l, c, h } = parseOklch(color)
+      steps.push({
+        level: levelStop,
+        color,
+        l,
+        c,
+        h,
+      })
+    }
+  }
+  
+  return steps
+}
 
-// 成功カラー
-const $successColor = computed(() => getCSSVariable('--success-color'))
-const $successHover = computed(() => getCSSVariable('--success-hover'))
+// 利用可能な色名を取得
+const colorNames = ref<string[]>([])
 
-// 危険カラー
-const $dangerColor = computed(() => getCSSVariable('--danger-color'))
-const $dangerHover = computed(() => getCSSVariable('--danger-hover'))
+// すべての色のスケールを動的に計算
+const colorScales = computed(() => {
+  const scales: Record<string, ReturnType<typeof calculateColorScale>> = {}
+  colorNames.value.forEach((colorName: string) => {
+    scales[colorName] = calculateColorScale(colorName)
+  })
+  return scales
+})
 
-// 背景色
-const $backgroundDark = computed(() => getCSSVariable('--background-dark'))
-const $backgroundLight = computed(() => getCSSVariable('--background-light'))
-const $backgroundGray = computed(() => getCSSVariable('--background-gray'))
-const $backgroundGrayHover = computed(() => getCSSVariable('--background-gray-hover'))
+// コンポーネントマウント時に色名を取得
+onMounted(() => {
+  colorNames.value = getAvailableColorNames()
+})
 
-// テキスト色
-const $textPrimary = computed(() => getCSSVariable('--text-primary'))
-const $textSecondary = computed(() => getCSSVariable('--text-secondary'))
-const $textTertiary = computed(() => getCSSVariable('--text-tertiary'))
-const $textWhite = computed(() => getCSSVariable('--text-white'))
+// ツールチップの状態
+const tooltip = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  oklch: '',
+})
 
-// ボーダー色
-const $borderColor = computed(() => getCSSVariable('--border-color'))
-const $borderLight = computed(() => getCSSVariable('--border-light'))
+// ツールチップを表示
+const showTooltip = (event: MouseEvent, step: { level: number; color: string; l: number; c: number; h: number }) => {
+  tooltip.value = {
+    visible: true,
+    x: event.clientX + 10,
+    y: event.clientY + 10,
+    oklch: step.color,
+  }
+}
 
-// シャドウ
-const $shadowSm = computed(() => getCSSVariable('--shadow-sm'))
-const $shadowMd = computed(() => getCSSVariable('--shadow-md'))
-const $shadowLg = computed(() => getCSSVariable('--shadow-lg'))
-const $shadowPrimary = computed(() => getCSSVariable('--shadow-primary'))
-const $shadowPrimarySm = computed(() => getCSSVariable('--shadow-primary-sm'))
-
-// 11段階の色スケール
-const $primaryScale = computed(() => [
-  getCSSVariable('--primary-0'),
-  getCSSVariable('--primary-1'),
-  getCSSVariable('--primary-2'),
-  getCSSVariable('--primary-3'),
-  getCSSVariable('--primary-4'),
-  getCSSVariable('--primary-5'),
-  getCSSVariable('--primary-6'),
-  getCSSVariable('--primary-7'),
-  getCSSVariable('--primary-8'),
-  getCSSVariable('--primary-9'),
-  getCSSVariable('--primary-10'),
-])
-
-const $secondaryScale = computed(() => [
-  getCSSVariable('--secondary-0'),
-  getCSSVariable('--secondary-1'),
-  getCSSVariable('--secondary-2'),
-  getCSSVariable('--secondary-3'),
-  getCSSVariable('--secondary-4'),
-  getCSSVariable('--secondary-5'),
-  getCSSVariable('--secondary-6'),
-  getCSSVariable('--secondary-7'),
-  getCSSVariable('--secondary-8'),
-  getCSSVariable('--secondary-9'),
-  getCSSVariable('--secondary-10'),
-])
-
-const $successScale = computed(() => [
-  getCSSVariable('--success-0'),
-  getCSSVariable('--success-1'),
-  getCSSVariable('--success-2'),
-  getCSSVariable('--success-3'),
-  getCSSVariable('--success-4'),
-  getCSSVariable('--success-5'),
-  getCSSVariable('--success-6'),
-  getCSSVariable('--success-7'),
-  getCSSVariable('--success-8'),
-  getCSSVariable('--success-9'),
-  getCSSVariable('--success-10'),
-])
-
-const $dangerScale = computed(() => [
-  getCSSVariable('--danger-0'),
-  getCSSVariable('--danger-1'),
-  getCSSVariable('--danger-2'),
-  getCSSVariable('--danger-3'),
-  getCSSVariable('--danger-4'),
-  getCSSVariable('--danger-5'),
-  getCSSVariable('--danger-6'),
-  getCSSVariable('--danger-7'),
-  getCSSVariable('--danger-8'),
-  getCSSVariable('--danger-9'),
-  getCSSVariable('--danger-10'),
-])
-
-const $neutralScale = computed(() => [
-  getCSSVariable('--neutral-0'),
-  getCSSVariable('--neutral-1'),
-  getCSSVariable('--neutral-2'),
-  getCSSVariable('--neutral-3'),
-  getCSSVariable('--neutral-4'),
-  getCSSVariable('--neutral-5'),
-  getCSSVariable('--neutral-6'),
-  getCSSVariable('--neutral-7'),
-  getCSSVariable('--neutral-8'),
-  getCSSVariable('--neutral-9'),
-  getCSSVariable('--neutral-10'),
-])
-
-// 設定値表示用（SCSS変数からCSS変数を経由して取得）
-const colorConfigs = computed(() => [
-  {
-    name: 'primary',
-    label: 'プライマリ',
-    hue: getCSSVariableNumber('--hue-primary'),
-    chroma: getCSSVariableNumber('--chroma-primary'),
-    hueRaw: getCSSVariable('--hue-primary'),
-    chromaRaw: getCSSVariable('--chroma-primary'),
-  },
-  {
-    name: 'secondary',
-    label: 'セカンダリ',
-    hue: getCSSVariableNumber('--hue-secondary'),
-    chroma: getCSSVariableNumber('--chroma-secondary'),
-    hueRaw: getCSSVariable('--hue-secondary'),
-    chromaRaw: getCSSVariable('--chroma-secondary'),
-  },
-  {
-    name: 'success',
-    label: '成功',
-    hue: getCSSVariableNumber('--hue-success'),
-    chroma: getCSSVariableNumber('--chroma-success'),
-    hueRaw: getCSSVariable('--hue-success'),
-    chromaRaw: getCSSVariable('--chroma-success'),
-  },
-  {
-    name: 'danger',
-    label: '危険',
-    hue: getCSSVariableNumber('--hue-danger'),
-    chroma: getCSSVariableNumber('--chroma-danger'),
-    hueRaw: getCSSVariable('--hue-danger'),
-    chromaRaw: getCSSVariable('--chroma-danger'),
-  },
-  {
-    name: 'neutral',
-    label: 'ニュートラル',
-    hue: getCSSVariableNumber('--hue-neutral'),
-    chroma: getCSSVariableNumber('--chroma-neutral'),
-    hueRaw: getCSSVariable('--hue-neutral'),
-    chromaRaw: getCSSVariable('--chroma-neutral'),
-  },
-])
+// ツールチップを非表示
+const hideTooltip = () => {
+  tooltip.value.visible = false
+}
 </script>
 
 <style lang="scss" scoped>
 @import '../styles/_color';
+
+$scale-cell-height: 50px;
+$scale-gap: 0.25rem;
 
 .color-palette {
   padding: 2rem;
@@ -538,14 +223,14 @@ const colorConfigs = computed(() => [
 
   h2 {
     margin: 0 0 0.5rem 0;
-    color: $text-primary;
+    color: oklch(0.25 0.01 0deg);
     font-size: 2rem;
     font-weight: 600;
   }
 
   p {
     margin: 0;
-    color: $text-secondary;
+    color: oklch(0.45 0.01 0deg);
     font-size: 1rem;
   }
 }
@@ -557,240 +242,170 @@ const colorConfigs = computed(() => [
 }
 
 .color-section {
-  background: $background-light;
+  background: oklch(1.0 0 0deg);
   border-radius: 8px;
   padding: 2rem;
-  box-shadow: $shadow-md;
+  box-shadow: 0 2px 8px oklch(0 0 0deg / 0.1);
 
   h3 {
     margin: 0 0 1.5rem 0;
-    color: $text-primary;
+    color: oklch(0.25 0.01 0deg);
     font-size: 1.5rem;
     font-weight: 600;
-    border-bottom: 2px solid $border-color;
+    border-bottom: 2px solid oklch(0.90 0.01 0deg);
     padding-bottom: 0.75rem;
   }
 }
 
-.color-grid {
+.gradient-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1.5rem;
-}
-
-.color-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.color-swatch {
-  width: 100%;
-  height: 120px;
-  border-radius: 8px;
-  box-shadow: $shadow-sm;
-  transition: transform 0.2s;
-
-  &:hover {
-    transform: scale(1.02);
-  }
-}
-
-.color-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.color-name {
-  font-weight: 600;
-  color: $text-primary;
-  font-size: 0.9rem;
-}
-
-.color-value {
-  font-family: 'Courier New', monospace;
-  font-size: 0.75rem;
-  color: $text-secondary;
-  word-break: break-all;
-}
-
-.shadow-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 2rem;
-}
-
-.shadow-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.shadow-demo {
-  width: 120px;
-  height: 120px;
-  background: $background-light;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.2s;
-
-  &:hover {
-    transform: scale(1.05);
-  }
-}
-
-.shadow-label {
-  font-weight: 600;
-  color: $text-primary;
-  font-size: 0.9rem;
-}
-
-.shadow-value {
-  font-family: 'Courier New', monospace;
-  font-size: 0.7rem;
-  color: $text-secondary;
-  text-align: center;
-  word-break: break-all;
-}
-
-// 11段階の色スケール用スタイル（画像のようなレイアウト）
-.color-scale-grid {
-  display: grid;
-  grid-template-columns: 60px repeat(5, 1fr);
-  gap: 0.5rem;
-  background: $background-light;
+  grid-template-columns: 150px 1fr 1fr;
+  grid-auto-rows: auto;
+  gap: $scale-gap;
+  background: oklch(1.0 0 0deg);
   padding: 1rem;
   border-radius: 8px;
-  box-shadow: $shadow-sm;
+  box-shadow: 0 2px 4px oklch(0 0 0deg / 0.1);
 }
 
-.scale-row-header-column {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.scale-row-header {
+.gradient-header {
   font-weight: 700;
-  color: $text-primary;
+  color: oklch(0.25 0.01 0deg);
   font-size: 0.875rem;
   text-align: center;
   padding: 0.5rem;
-  background: $background-gray;
+  background: oklch(0.97 0.005 0deg);
   border-radius: 6px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 40px;
-}
-
-.scale-column {
-  display: flex;
-  flex-direction: column;
   gap: 0.25rem;
+  box-sizing: border-box;
+  min-height: 60px;
 }
 
-.scale-column-header {
-  font-weight: 700;
-  color: $text-primary;
-  font-size: 1rem;
-  text-align: center;
-  padding: 0.5rem;
-  background: $background-gray;
-  border-radius: 6px;
-  margin-bottom: 0.25rem;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.header-label-sub {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: oklch(0.45 0.01 0deg);
 }
 
-.scale-cell {
+.gradient-step-cell {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 0.5rem;
   border-radius: 6px;
-  transition: background-color 0.2s;
-  height: 40px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: oklch(0.25 0.01 0deg);
+  background: oklch(0.97 0.005 0deg);
+  box-sizing: border-box;
+  min-height: $scale-cell-height;
 
-  &:hover {
-    background-color: $background-gray;
+  &.base-color {
+    background: calc-color-primary(50);
+    color: oklch(0.95 0 0deg);
   }
 }
 
-.scale-swatch {
+.step-number {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.gradient-swatch-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.gradient-swatch {
   width: 100%;
   height: 100%;
+  min-height: $scale-cell-height;
   border-radius: 4px;
-  box-shadow: $shadow-sm;
+  box-shadow: 0 2px 4px oklch(0 0 0deg / 0.1);
   transition: transform 0.2s, box-shadow 0.2s;
   cursor: pointer;
 
   &:hover {
     transform: scale(1.05);
-    box-shadow: $shadow-md;
+    box-shadow: 0 2px 8px oklch(0 0 0deg / 0.1);
+  }
+
+  &.base-color-swatch {
+    border: 2px solid calc-color-primary(50);
+    // 基準色のoklch値に透明度を追加（hue: 260, chroma: 0.15, lightness: 0.9）
+    box-shadow: 0 2px 8px oklch(0.9 0.15 260deg / 0.3);
   }
 }
 
-// 設定値表示用スタイル
-.config-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
-}
-
-.config-card {
-  background: $background-light;
-  border: 1px solid $border-color;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: $shadow-sm;
-}
-
-.config-header {
-  font-weight: 700;
-  color: $text-white;
-  background: $primary-color;
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-}
-
-.config-content {
-  padding: 1rem;
+.gradient-param-cell {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.config-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.config-label {
-  font-weight: 600;
-  color: $text-primary;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: 6px;
   font-size: 0.875rem;
-}
-
-.config-value {
-  color: $text-secondary;
-  font-size: 0.875rem;
-  font-family: 'Courier New', monospace;
+  color: oklch(0.25 0.01 0deg);
+  box-sizing: border-box;
+  min-height: $scale-cell-height;
 
   &.code {
-    background: $background-gray;
-    padding: 0.5rem;
-    border-radius: 4px;
-    white-space: pre-wrap;
-    line-height: 1.5;
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: oklch(0.45 0.01 0deg);
+    word-break: break-all;
+    text-align: center;
+  }
+}
+
+// ツールチップ
+.tooltip {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  background: oklch(0.20 0.01 0deg);
+  border: 1px solid oklch(0.90 0.01 0deg);
+  border-radius: 6px;
+  padding: 0.75rem;
+  box-shadow: 0 4px 16px oklch(0 0 0deg / 0.15);
+  min-width: 200px;
+}
+
+.tooltip-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tooltip-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.tooltip-label {
+  font-weight: 600;
+  color: oklch(0.95 0 0deg);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.tooltip-value {
+  color: oklch(0.95 0 0deg);
+  font-size: 0.875rem;
+  text-align: right;
+  word-break: break-all;
+
+  &.code {
+    font-family: 'Courier New', monospace;
   }
 }
 </style>

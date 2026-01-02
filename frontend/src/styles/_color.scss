@@ -1,225 +1,116 @@
-// ベースカラー（色相）
-$hue-primary: 270deg;    // プライマリ（紫）
-$hue-secondary: 220deg; // セカンダリ（青）
-$hue-success: 145deg;   // 成功（緑）
-$hue-danger: 15deg;      // 危険（赤）
-$hue-neutral: 0deg;      // ニュートラル（グレー）
+$base-color: (
+    "primary": (
+        "lightness": 0.6469,
+        "chroma": 0.2745,
+        "hue": 30.18,
+    ),
+    "secondary": (
+        "lightness": 0.9,
+        "chroma": 0.15,
+        "hue": 260,
+    ),
+);
 
-// 彩度設定（各色相に応じた適切な彩度）
-$chroma-primary: 0.15;
-$chroma-secondary: 0.12;
-$chroma-success: 0.15;
-$chroma-danger: 0.20;
-$chroma-neutral: 0.01;
+// 色設定値参考
+// https://oklch.com
 
-// プライマリカラー 11段階（明度 0.0 ～ 1.0）
-$primary-0: oklch(0.0 $chroma-primary $hue-primary);
-$primary-1: oklch(0.1 $chroma-primary $hue-primary);
-$primary-2: oklch(0.2 $chroma-primary $hue-primary);
-$primary-3: oklch(0.3 $chroma-primary $hue-primary);
-$primary-4: oklch(0.4 $chroma-primary $hue-primary);
-$primary-5: oklch(0.5 $chroma-primary $hue-primary);
-$primary-6: oklch(0.6 $chroma-primary $hue-primary);
-$primary-7: oklch(0.7 $chroma-primary $hue-primary);
-$primary-8: oklch(0.8 $chroma-primary $hue-primary);
-$primary-9: oklch(0.9 $chroma-primary $hue-primary);
-$primary-10: oklch(1.0 $chroma-primary $hue-primary);
+@function calc-color($color-name, $lightnessLevel: 50) {
+    // $color-name: 基準色の名前（"primary" または "secondary"）
+    // $lightnessLevel: 明度レベル（0から100、50が基準色）
+    
+    // 基準色を取得
+    $color-config: map-get($base-color, $color-name);
+    $hue: map-get($color-config, "hue");
+    $base-chroma: map-get($color-config, "chroma");
+    $base-lightness: map-get($color-config, "lightness");
 
-// セカンダリカラー 11段階（明度 0.0 ～ 1.0）
-$secondary-0: oklch(0.0 $chroma-secondary $hue-secondary);
-$secondary-1: oklch(0.1 $chroma-secondary $hue-secondary);
-$secondary-2: oklch(0.2 $chroma-secondary $hue-secondary);
-$secondary-3: oklch(0.3 $chroma-secondary $hue-secondary);
-$secondary-4: oklch(0.4 $chroma-secondary $hue-secondary);
-$secondary-5: oklch(0.5 $chroma-secondary $hue-secondary);
-$secondary-6: oklch(0.6 $chroma-secondary $hue-secondary);
-$secondary-7: oklch(0.7 $chroma-secondary $hue-secondary);
-$secondary-8: oklch(0.8 $chroma-secondary $hue-secondary);
-$secondary-9: oklch(0.9 $chroma-secondary $hue-secondary);
-$secondary-10: oklch(1.0 $chroma-secondary $hue-secondary);
+    // レベルを0-1の範囲に正規化
+    $t: 0;
+    @if $lightnessLevel < 50 {
+        // 基準色から黒へ（明度を下げる）
+        $t: (50 - $lightnessLevel) / 50; // 0から1.0（50→0, 0→1.0）
+    } @else if $lightnessLevel > 50 {
+        // 基準色から白へ（明度を上げる）
+        $t: ($lightnessLevel - 50) / 50; // 0から1.0（50→0, 100→1.0）
+    }
 
-// 成功カラー 11段階（明度 0.0 ～ 1.0）
-$success-0: oklch(0.0 $chroma-success $hue-success);
-$success-1: oklch(0.1 $chroma-success $hue-success);
-$success-2: oklch(0.2 $chroma-success $hue-success);
-$success-3: oklch(0.3 $chroma-success $hue-success);
-$success-4: oklch(0.4 $chroma-success $hue-success);
-$success-5: oklch(0.5 $chroma-success $hue-success);
-$success-6: oklch(0.6 $chroma-success $hue-success);
-$success-7: oklch(0.7 $chroma-success $hue-success);
-$success-8: oklch(0.8 $chroma-success $hue-success);
-$success-9: oklch(0.9 $chroma-success $hue-success);
-$success-10: oklch(1.0 $chroma-success $hue-success);
+    // 明度を計算
+    $l: $base-lightness;
+    @if $lightnessLevel < 50 {
+        // 基準色から黒へ（明度を下げる）
+        $l: $base-lightness * (1 - $t);
+    } @else if $lightnessLevel > 50 {
+        // 基準色から白へ（明度を上げる）
+        $l: $base-lightness + (1.0 - $base-lightness) * $t;
+    }
+    
+    // 明度を0-1の範囲にクランプ
+    @if $l < 0 { $l: 0; }
+    @if $l > 1 { $l: 1; }
 
-// 危険カラー 11段階（明度 0.0 ～ 1.0）
-$danger-0: oklch(0.0 $chroma-danger $hue-danger);
-$danger-1: oklch(0.1 $chroma-danger $hue-danger);
-$danger-2: oklch(0.2 $chroma-danger $hue-danger);
-$danger-3: oklch(0.3 $chroma-danger $hue-danger);
-$danger-4: oklch(0.4 $chroma-danger $hue-danger);
-$danger-5: oklch(0.5 $chroma-danger $hue-danger);
-$danger-6: oklch(0.6 $chroma-danger $hue-danger);
-$danger-7: oklch(0.7 $chroma-danger $hue-danger);
-$danger-8: oklch(0.8 $chroma-danger $hue-danger);
-$danger-9: oklch(0.9 $chroma-danger $hue-danger);
-$danger-10: oklch(1.0 $chroma-danger $hue-danger);
+    // 彩度を計算（両方向で彩度を下げる）
+    $c: $base-chroma;
+    @if $lightnessLevel != 50 {
+        $c: $base-chroma * (1 - $t);
+    }
+    
+    // 彩度を0-1の範囲にクランプ
+    @if $c < 0 { $c: 0; }
+    @if $c > 1 { $c: 1; }
 
-// ニュートラルカラー 11段階（明度 0.0 ～ 1.0）
-$neutral-0: oklch(0.0 $chroma-neutral $hue-neutral);
-$neutral-1: oklch(0.1 $chroma-neutral $hue-neutral);
-$neutral-2: oklch(0.2 $chroma-neutral $hue-neutral);
-$neutral-3: oklch(0.3 $chroma-neutral $hue-neutral);
-$neutral-4: oklch(0.4 $chroma-neutral $hue-neutral);
-$neutral-5: oklch(0.5 $chroma-neutral $hue-neutral);
-$neutral-6: oklch(0.6 $chroma-neutral $hue-neutral);
-$neutral-7: oklch(0.7 $chroma-neutral $hue-neutral);
-$neutral-8: oklch(0.8 $chroma-neutral $hue-neutral);
-$neutral-9: oklch(0.9 $chroma-neutral $hue-neutral);
-$neutral-10: oklch(1.0 $chroma-neutral $hue-neutral);
+    // 色を計算して返す
+    @return oklch($l $c $hue);
+}
 
-// プライマリカラー（oklch）
-$primary-gradient-start: oklch(0.65 0.15 $hue-primary);
-$primary-gradient-end: oklch(0.50 0.18 $hue-primary);
-$primary-color: oklch(0.65 0.15 $hue-primary);
-$primary-hover: oklch(0.60 0.16 $hue-primary);
+@function calc-color-primary($lightnessLevel: 50) {
+    @return calc-color("primary", $lightnessLevel);
+}
 
-// セカンダリカラー（oklch）
-$secondary-color: oklch(0.90 0.01 $hue-neutral);
-$secondary-hover: oklch(0.85 0.01 $hue-neutral);
+@function calc-color-secondary($lightnessLevel: 50) {
+    @return calc-color("secondary", $lightnessLevel);
+}
 
-// 成功カラー（oklch）
-$success-color: oklch(0.65 0.15 $hue-success);
-$success-hover: oklch(0.60 0.16 $hue-success);
+// 基本カラー変数（既存のコードとの互換性のため）
+$primary-color: calc-color-primary(50);
+$primary-hover: calc-color-primary(49);
+$primary-gradient-start: calc-color-primary(52);
+$primary-gradient-end: calc-color-primary(48);
 
-// 危険カラー（oklch）
-$danger-color: oklch(0.60 0.20 $hue-danger);
-$danger-hover: oklch(0.55 0.22 $hue-danger);
+// 背景色
+$background-dark: oklch(0.20 0.01 0deg);
+$background-light: oklch(1.0 0 0deg);
+$background-gray: oklch(0.97 0.005 0deg);
+$background-gray-hover: oklch(0.93 0.005 0deg);
 
-// 背景色（oklch）
-$background-dark: oklch(0.20 0.01 $hue-neutral);
-$background-light: oklch(1.0 0 $hue-neutral);
-$background-gray: oklch(0.97 0.005 $hue-neutral);
-$background-gray-hover: oklch(0.93 0.005 $hue-neutral);
+// テキスト色
+$text-primary: oklch(0.25 0.01 0deg);
+$text-secondary: oklch(0.45 0.01 0deg);
+$text-white: oklch(0.95 0 0deg);
 
-// テキスト色（oklch）
-$text-primary: oklch(0.25 0.01 $hue-neutral);
-$text-secondary: oklch(0.45 0.01 $hue-neutral);
-$text-tertiary: oklch(0.60 0.01 $hue-neutral);
-$text-white: oklch(0.95 0 $hue-neutral);
+// ボーダー色
+$border-color: oklch(0.90 0.01 0deg);
 
-// ボーダー色（oklch）
-$border-color: oklch(0.90 0.01 $hue-neutral);
-$border-light: oklch(0.95 0 $hue-neutral / 0.1);
-
-// シャドウ（oklchベースの色を使用）
-$shadow-sm: 0 2px 4px oklch(0 0 $hue-neutral / 0.1);
-$shadow-md: 0 2px 8px oklch(0 0 $hue-neutral / 0.1);
-$shadow-lg: 0 4px 16px oklch(0 0 $hue-neutral / 0.15);
-$shadow-primary: 0 5px 15px oklch(0.65 0.15 $hue-primary / 0.4);
-$shadow-primary-sm: 0 2px 8px oklch(0.65 0.15 $hue-primary / 0.3);
+// シャドウ
+$shadow-sm: 0 2px 4px oklch(0 0 0deg / 0.1);
+$shadow-md: 0 2px 8px oklch(0 0 0deg / 0.1);
+$shadow-lg: 0 4px 16px oklch(0 0 0deg / 0.15);
+$shadow-primary: 0 5px 15px oklch(0.9 0.15 260deg / 0.4);
+$shadow-primary-sm: 0 2px 8px oklch(0.9 0.15 260deg / 0.3);
 
 // CSS変数としてエクスポート（JavaScriptから使用可能）
 :root {
-  // 設定値（SCSS変数から）
-  --hue-primary: #{$hue-primary};
-  --hue-secondary: #{$hue-secondary};
-  --hue-success: #{$hue-success};
-  --hue-danger: #{$hue-danger};
-  --hue-neutral: #{$hue-neutral};
-  --chroma-primary: #{$chroma-primary};
-  --chroma-secondary: #{$chroma-secondary};
-  --chroma-success: #{$chroma-success};
-  --chroma-danger: #{$chroma-danger};
-  --chroma-neutral: #{$chroma-neutral};
+  // $base-colorマップから動的にグラデーションを生成
+  @each $color-name, $color-config in $base-color {
+    // 基準色の設定値をエクスポート
+    --base-#{$color-name}-hue: #{map-get($color-config, "hue")};
+    --base-#{$color-name}-chroma: #{map-get($color-config, "chroma")};
+    --base-#{$color-name}-lightness: #{map-get($color-config, "lightness")};
 
-  --primary-color: #{$primary-color};
-  --primary-hover: #{$primary-hover};
-  --primary-gradient-start: #{$primary-gradient-start};
-  --primary-gradient-end: #{$primary-gradient-end};
-  --secondary-color: #{$secondary-color};
-  --secondary-hover: #{$secondary-hover};
-  --success-color: #{$success-color};
-  --success-hover: #{$success-hover};
-  --danger-color: #{$danger-color};
-  --danger-hover: #{$danger-hover};
-  --background-dark: #{$background-dark};
-  --background-light: #{$background-light};
-  --background-gray: #{$background-gray};
-  --background-gray-hover: #{$background-gray-hover};
-  --text-primary: #{$text-primary};
-  --text-secondary: #{$text-secondary};
-  --text-tertiary: #{$text-tertiary};
-  --text-white: #{$text-white};
-  --border-color: #{$border-color};
-  --border-light: #{$border-light};
-  --shadow-sm: #{$shadow-sm};
-  --shadow-md: #{$shadow-md};
-  --shadow-lg: #{$shadow-lg};
-  --shadow-primary: #{$shadow-primary};
-  --shadow-primary-sm: #{$shadow-primary-sm};
-
-  // プライマリカラー 11段階
-  --primary-0: #{$primary-0};
-  --primary-1: #{$primary-1};
-  --primary-2: #{$primary-2};
-  --primary-3: #{$primary-3};
-  --primary-4: #{$primary-4};
-  --primary-5: #{$primary-5};
-  --primary-6: #{$primary-6};
-  --primary-7: #{$primary-7};
-  --primary-8: #{$primary-8};
-  --primary-9: #{$primary-9};
-  --primary-10: #{$primary-10};
-
-  // セカンダリカラー 11段階
-  --secondary-0: #{$secondary-0};
-  --secondary-1: #{$secondary-1};
-  --secondary-2: #{$secondary-2};
-  --secondary-3: #{$secondary-3};
-  --secondary-4: #{$secondary-4};
-  --secondary-5: #{$secondary-5};
-  --secondary-6: #{$secondary-6};
-  --secondary-7: #{$secondary-7};
-  --secondary-8: #{$secondary-8};
-  --secondary-9: #{$secondary-9};
-  --secondary-10: #{$secondary-10};
-
-  // 成功カラー 11段階
-  --success-0: #{$success-0};
-  --success-1: #{$success-1};
-  --success-2: #{$success-2};
-  --success-3: #{$success-3};
-  --success-4: #{$success-4};
-  --success-5: #{$success-5};
-  --success-6: #{$success-6};
-  --success-7: #{$success-7};
-  --success-8: #{$success-8};
-  --success-9: #{$success-9};
-  --success-10: #{$success-10};
-
-  // 危険カラー 11段階
-  --danger-0: #{$danger-0};
-  --danger-1: #{$danger-1};
-  --danger-2: #{$danger-2};
-  --danger-3: #{$danger-3};
-  --danger-4: #{$danger-4};
-  --danger-5: #{$danger-5};
-  --danger-6: #{$danger-6};
-  --danger-7: #{$danger-7};
-  --danger-8: #{$danger-8};
-  --danger-9: #{$danger-9};
-  --danger-10: #{$danger-10};
-
-  // ニュートラルカラー 11段階
-  --neutral-0: #{$neutral-0};
-  --neutral-1: #{$neutral-1};
-  --neutral-2: #{$neutral-2};
-  --neutral-3: #{$neutral-3};
-  --neutral-4: #{$neutral-4};
-  --neutral-5: #{$neutral-5};
-  --neutral-6: #{$neutral-6};
-  --neutral-7: #{$neutral-7};
-  --neutral-8: #{$neutral-8};
-  --neutral-9: #{$neutral-9};
-  --neutral-10: #{$neutral-10};
+    // グラデーション（0から100まで、すべてのレベルを生成）
+    // 50が基準色、0が黒に近づく、100が白に近づく
+    // 実際に使用する範囲はColorPalette.vueで制御
+    @for $level from 0 through 100 {
+      --#{$color-name}-#{$level}: #{calc-color($color-name, $level)};
+    }
+  }
 }
