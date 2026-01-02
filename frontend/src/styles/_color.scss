@@ -1,0 +1,47 @@
+// ベースカラー（色相）
+$hue-primary: 270deg;    // プライマリ（紫）
+$hue-secondary: 220deg; // セカンダリ（青）
+$hue-success: 145deg;   // 成功（緑）
+$hue-danger: 15deg;      // 危険（赤）
+$hue-neutral: 0deg;      // ニュートラル（グレー）
+
+// プライマリカラー（oklch）
+$primary-gradient-start: oklch(0.65 0.15 $hue-primary);
+$primary-gradient-end: oklch(0.50 0.18 $hue-primary);
+$primary-color: oklch(0.65 0.15 $hue-primary);
+$primary-hover: oklch(0.60 0.16 $hue-primary);
+
+// セカンダリカラー（oklch）
+$secondary-color: oklch(0.90 0.01 $hue-neutral);
+$secondary-hover: oklch(0.85 0.01 $hue-neutral);
+
+// 成功カラー（oklch）
+$success-color: oklch(0.65 0.15 $hue-success);
+$success-hover: oklch(0.60 0.16 $hue-success);
+
+// 危険カラー（oklch）
+$danger-color: oklch(0.60 0.20 $hue-danger);
+$danger-hover: oklch(0.55 0.22 $hue-danger);
+
+// 背景色（oklch）
+$background-dark: oklch(0.20 0.01 $hue-neutral);
+$background-light: oklch(1.0 0 $hue-neutral);
+$background-gray: oklch(0.97 0.005 $hue-neutral);
+$background-gray-hover: oklch(0.93 0.005 $hue-neutral);
+
+// テキスト色（oklch）
+$text-primary: oklch(0.25 0.01 $hue-neutral);
+$text-secondary: oklch(0.45 0.01 $hue-neutral);
+$text-tertiary: oklch(0.60 0.01 $hue-neutral);
+$text-white: oklch(0.95 0 $hue-neutral);
+
+// ボーダー色（oklch）
+$border-color: oklch(0.90 0.01 $hue-neutral);
+$border-light: oklch(0.95 0 $hue-neutral / 0.1);
+
+// シャドウ（oklchベースの色を使用）
+$shadow-sm: 0 2px 4px oklch(0 0 $hue-neutral / 0.1);
+$shadow-md: 0 2px 8px oklch(0 0 $hue-neutral / 0.1);
+$shadow-lg: 0 4px 16px oklch(0 0 $hue-neutral / 0.15);
+$shadow-primary: 0 5px 15px oklch(0.65 0.15 $hue-primary / 0.4);
+$shadow-primary-sm: 0 2px 8px oklch(0.65 0.15 $hue-primary / 0.3);

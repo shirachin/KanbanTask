@@ -23,6 +23,8 @@ import Dashboard from './views/Dashboard.vue'
 </script>
 
 <style lang="scss" scoped>
+@import './styles/_color';
+
 .app {
   min-height: 100vh;
   width: 100%;
@@ -37,10 +39,10 @@ import Dashboard from './views/Dashboard.vue'
 
 .header {
   grid-area: header;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: linear-gradient(135deg, $primary-gradient-start 0%, $primary-gradient-end 100%);
+  color: $text-white;
   padding: 1.5rem 2rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: $shadow-sm;
 
   h1 {
     margin: 0;
@@ -51,8 +53,8 @@ import Dashboard from './views/Dashboard.vue'
 
 .nav {
   grid-area: nav;
-  background: #f8f9fa;
-  border-right: 1px solid #e0e0e0;
+  background: $background-gray;
+  border-right: 1px solid $border-color;
   padding: 1rem 0;
 }
 
@@ -65,18 +67,18 @@ import Dashboard from './views/Dashboard.vue'
 .nav-link {
   display: block;
   padding: 0.75rem 1.5rem;
-  color: #333;
+  color: $text-primary;
   text-decoration: none;
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: #e9ecef;
+    background-color: $background-gray-hover;
   }
 
   &:active,
   &.active {
-    background-color: #667eea;
-    color: white;
+    background-color: $primary-color;
+    color: $text-white;
   }
 }
 
@@ -84,16 +86,16 @@ import Dashboard from './views/Dashboard.vue'
   grid-area: main;
   padding: 2rem;
   overflow-y: auto;
-  background: #ffffff;
+  background: $background-light;
 }
 
 .footer {
   grid-area: footer;
-  background: #f8f9fa;
-  border-top: 1px solid #e0e0e0;
+  background: $background-gray;
+  border-top: 1px solid $border-color;
   padding: 1rem 2rem;
   text-align: center;
-  color: #666;
+  color: $text-secondary;
   font-size: 0.875rem;
 
   p {
