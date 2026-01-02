@@ -1,5 +1,6 @@
 <template>
-  <div class="app" :class="{ 'nav-collapsed': !navOpen }">
+  <Login v-if="!hasUser" />
+  <div v-else class="app" :class="{ 'nav-collapsed': !navOpen }">
     <header class="header">
       <div class="header-content">
         <button 
@@ -49,6 +50,16 @@
           </a>
         </li>
       </ul>
+      <div class="nav-user" @click="toggleUserMenu">
+        <span class="material-symbols-outlined user-icon">account_circle</span>
+        <span class="user-name">{{ currentUser }}</span>
+        <div v-if="showUserMenu" class="user-menu">
+          <button type="button" class="user-menu-item" @click="handleLogout">
+            <span class="material-symbols-outlined user-menu-icon">logout</span>
+            <span class="user-menu-text">ログアウト</span>
+          </button>
+        </div>
+      </div>
     </nav>
     <main class="main">
       <Dashboard v-if="currentView === 'dashboard'" />
@@ -65,23 +76,105 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Dashboard from './views/Dashboard.vue'
 import ColorPalette from './views/ColorPalette.vue'
+import Login from './views/Login.vue'
 import ThemeSelector from './components/ThemeSelector.vue'
 
 type ViewType = 'dashboard' | 'kanban' | 'color-palette'
 
 const currentView = ref<ViewType>('dashboard')
 const navOpen = ref(true)
+const showUserMenu = ref(false)
 
+// URLパラメータからユーザー名を取得
+const getUrlUser = (): string | null => {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('user')
+}
+
+const currentUser = ref<string | null>(getUrlUser())
+const hasUser = computed(() => currentUser.value !== null)
+
+// URLパラメータを維持しながらビューを切り替え
 const switchView = (view: ViewType) => {
   currentView.value = view
+  // URLパラメータを維持
+  if (currentUser.value) {
+    const url = new URL(window.location.href)
+    url.searchParams.set('user', currentUser.value)
+    url.searchParams.set('view', view)
+    window.history.pushState({}, '', url.toString())
+  }
 }
 
 const toggleNav = () => {
   navOpen.value = !navOpen.value
 }
+
+const toggleUserMenu = () => {
+  showUserMenu.value = !showUserMenu.value
+}
+
+const handleLogout = () => {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('user')
+  url.searchParams.delete('view')
+  window.location.href = url.toString()
+}
+
+// メニュー外をクリックしたら閉じる
+const handleClickOutside = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  if (!target.closest('.nav-user') && !target.closest('.user-menu')) {
+    showUserMenu.value = false
+  }
+}
+
+  // URLパラメータの変更を監視
+  onMounted(() => {
+    // 初期ビューをURLパラメータから取得
+    const params = new URLSearchParams(window.location.search)
+    const viewParam = params.get('view') as ViewType | null
+    if (viewParam && ['dashboard', 'kanban', 'color-palette'].includes(viewParam)) {
+      currentView.value = viewParam
+    }
+
+    // URLパラメータの変更を監視（ブラウザの戻る/進むボタン対応）
+    window.addEventListener('popstate', () => {
+      const user = getUrlUser()
+      if (user) {
+        currentUser.value = user
+        const params = new URLSearchParams(window.location.search)
+        const viewParam = params.get('view') as ViewType | null
+        if (viewParam && ['dashboard', 'kanban', 'color-palette'].includes(viewParam)) {
+          currentView.value = viewParam
+        }
+      } else {
+        currentUser.value = null
+      }
+    })
+
+    // クリックイベントリスナーを追加
+    document.addEventListener('click', handleClickOutside)
+  })
+
+  onUnmounted(() => {
+    document.removeEventListener('click', handleClickOutside)
+  })
+
+// ユーザー名が変更されたらURLを更新
+watch(currentUser, (newUser: string | null) => {
+  if (newUser) {
+    const url = new URL(window.location.href)
+    url.searchParams.set('user', newUser)
+    if (currentView.value) {
+      url.searchParams.set('view', currentView.value)
+    }
+    window.history.replaceState({}, '', url.toString())
+  }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -173,14 +266,16 @@ const toggleNav = () => {
   grid-area: nav;
   background: var(--current-navBackground);
   border-right: 1px solid var(--current-borderColor);
-  padding: 1rem 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  padding: 0;
+  overflow: hidden;
   width: 200px;
   min-width: 200px;
   height: 100%;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   transform: translateX(0);
+  display: flex;
+  flex-direction: column;
+  position: relative;
 
   &.nav-collapsed {
     transform: translateX(-100%);
@@ -189,8 +284,11 @@ const toggleNav = () => {
 
 .nav-list {
   list-style: none;
-  padding: 0;
+  padding: 1rem 0;
   margin: 0;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .nav-link {
@@ -207,7 +305,98 @@ const toggleNav = () => {
   &:active,
   &.active {
     background-color: var(--current-activeBackground);
-    color: $text-white;
+    color: var(--current-textWhite);
+  }
+}
+
+.nav-user {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--current-borderColor);
+  background: var(--current-navBackground);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+
+  &:hover {
+    background-color: var(--current-hoverBackground);
+  }
+
+  .user-icon {
+    font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24;
+    font-size: 1.5rem;
+    color: var(--current-textPrimary);
+    flex-shrink: 0;
+  }
+
+  .user-name {
+    color: var(--current-textPrimary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
+    text-align: center;
+    word-break: break-word;
+  }
+}
+
+.user-menu {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  background: var(--current-backgroundLight);
+  border: 1px solid var(--current-borderColor);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px var(--current-shadowLg);
+  padding: 0.5rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--current-textPrimary);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-align: left;
+  width: 100%;
+
+  &:hover {
+    background: var(--current-hoverBackground);
+  }
+
+  .user-menu-icon {
+    font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24;
+    font-size: 1.25rem;
+    color: var(--current-textPrimary);
+    flex-shrink: 0;
+  }
+
+  .user-menu-text {
+    font-size: 0.875rem;
+    font-weight: 500;
   }
 }
 
