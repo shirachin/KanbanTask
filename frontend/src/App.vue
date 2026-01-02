@@ -43,10 +43,40 @@
           <a 
             href="#" 
             class="nav-link" 
-            :class="{ active: currentView === 'color-palette' }"
-            @click.prevent="switchView('color-palette')"
+            :class="{ active: currentView === 'todo' }"
+            @click.prevent="switchView('todo')"
           >
-            色見本
+            TODOリスト
+          </a>
+        </li>
+        <li>
+          <a 
+            href="#" 
+            class="nav-link" 
+            :class="{ active: currentView === 'gantt' }"
+            @click.prevent="switchView('gantt')"
+          >
+            ガントチャート
+          </a>
+        </li>
+        <li>
+          <a 
+            href="#" 
+            class="nav-link" 
+            :class="{ active: currentView === 'project' }"
+            @click.prevent="switchView('project')"
+          >
+            プロジェクト管理
+          </a>
+        </li>
+        <li>
+          <a 
+            href="#" 
+            class="nav-link" 
+            :class="{ active: currentView === 'help' }"
+            @click.prevent="switchView('help')"
+          >
+            使い方
           </a>
         </li>
       </ul>
@@ -63,13 +93,15 @@
     </nav>
     <main class="main">
       <Dashboard v-if="currentView === 'dashboard'" />
-      <ColorPalette v-else-if="currentView === 'color-palette'" />
-      <div v-else-if="currentView === 'kanban'" class="placeholder">
-        <p>カンバンボード（準備中）</p>
-      </div>
+      <KanbanBoard v-else-if="currentView === 'kanban'" />
+      <TodoList v-else-if="currentView === 'todo'" />
+      <GanttChart v-else-if="currentView === 'gantt'" />
+      <ProjectManagement v-else-if="currentView === 'project'" />
+      <Changelog v-else-if="currentView === 'changelog'" />
+      <Help v-else-if="currentView === 'help'" />
     </main>
     <footer class="footer">
-      <span class="version">β0.1.0</span>
+      <span class="version" @click="switchView('changelog')">β0.1.0</span>
       <span class="current-time">{{ currentTime }}</span>
     </footer>
   </div>
@@ -78,11 +110,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Dashboard from './views/Dashboard.vue'
-import ColorPalette from './views/ColorPalette.vue'
+import KanbanBoard from './views/KanbanBoard.vue'
+import TodoList from './views/TodoList.vue'
+import GanttChart from './views/GanttChart.vue'
+import ProjectManagement from './views/ProjectManagement.vue'
+import Changelog from './views/Changelog.vue'
+import Help from './views/Help.vue'
 import Login from './views/Login.vue'
 import ThemeSelector from './components/ThemeSelector.vue'
 
-type ViewType = 'dashboard' | 'kanban' | 'color-palette'
+type ViewType = 'dashboard' | 'kanban' | 'todo' | 'gantt' | 'project' | 'changelog' | 'help'
 
 const currentView = ref<ViewType>('dashboard')
 const navOpen = ref(true)
@@ -152,7 +189,7 @@ const handleClickOutside = (event: MouseEvent) => {
     // 初期ビューをURLパラメータから取得
     const params = new URLSearchParams(window.location.search)
     const viewParam = params.get('view') as ViewType | null
-    if (viewParam && ['dashboard', 'kanban', 'color-palette'].includes(viewParam)) {
+    if (viewParam && ['dashboard', 'kanban', 'todo', 'gantt', 'project', 'changelog', 'help'].includes(viewParam)) {
       currentView.value = viewParam
     }
 
@@ -163,7 +200,7 @@ const handleClickOutside = (event: MouseEvent) => {
         currentUser.value = user
         const params = new URLSearchParams(window.location.search)
         const viewParam = params.get('view') as ViewType | null
-        if (viewParam && ['dashboard', 'kanban', 'color-palette'].includes(viewParam)) {
+        if (viewParam && ['dashboard', 'kanban', 'todo', 'gantt', 'project', 'changelog', 'help'].includes(viewParam)) {
           currentView.value = viewParam
         }
       } else {
@@ -436,22 +473,44 @@ watch(currentUser, (newUser: string | null) => {
   grid-area: footer;
   background: var(--current-footerBackground);
   border-top: 1px solid var(--current-borderColor);
-  padding: 0.5rem 1rem;
+  padding: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   color: var(--current-textSecondary);
   font-size: 0.875rem;
+  height: 22px;
+  line-height: 22px;
 
   .version {
     font-size: 0.875rem;
-    opacity: 0.7;
+    color: var(--current-textSecondary);
+    cursor: pointer;
+    padding: 0 1rem;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.15s, color 0.15s;
+    user-select: none;
+
+    &:hover {
+      background-color: rgba(128, 128, 128, 0.2);
+      color: var(--current-textPrimary);
+    }
+
+    &:active {
+      background-color: rgba(128, 128, 128, 0.3);
+    }
   }
 
   .current-time {
     font-size: 0.875rem;
     font-family: 'Courier New', monospace;
     opacity: 0.8;
+    padding: 0 1rem;
+    height: 100%;
+    display: flex;
+    align-items: center;
   }
 }
 

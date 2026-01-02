@@ -9,6 +9,9 @@ class Project(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
+    start_month = Column(String, nullable=True)  # YYYY-MM形式
+    end_month = Column(String, nullable=True)  # YYYY-MM形式
+    assignee = Column(String, nullable=True)  # JSON配列として保存（カンマ区切りまたはJSON）
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

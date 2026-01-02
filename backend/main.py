@@ -62,6 +62,12 @@ def startup_event():
     except Exception as e:
         print(f"プロジェクトマイグレーションエラー（無視可能）: {e}")
     
+    try:
+        from migrate_add_project_fields import migrate as migrate_project_fields
+        migrate_project_fields()
+    except Exception as e:
+        print(f"プロジェクトフィールドマイグレーションエラー（無視可能）: {e}")
+    
     # デフォルトステータスの初期化（各プロジェクトごと）
     from database import SessionLocal
     db = SessionLocal()
@@ -262,19 +268,46 @@ def delete_status(status_id: int, db: Session = Depends(get_db)):
 # プロジェクト管理API
 @app.get("/api/projects", response_model=List[ProjectResponse])
 def get_projects(db: Session = Depends(get_db)):
+    import json
     projects = db.query(Project).order_by(Project.created_at.desc()).all()
+    # assigneeをリストに変換
+    for project in projects:
+        if project.assignee:
+            try:
+                project.assignee = json.loads(project.assignee)
+            except:
+                project.assignee = []
+        else:
+            project.assignee = []
     return projects
 
 @app.get("/api/projects/{project_id}", response_model=ProjectResponse)
 def get_project(project_id: int, db: Session = Depends(get_db)):
+    import json
     project = db.query(Project).filter(Project.id == project_id).first()
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    # assigneeをリストに変換
+    if project.assignee:
+        try:
+            project.assignee = json.loads(project.assignee)
+        except:
+            project.assignee = []
+    else:
+        project.assignee = []
     return project
 
 @app.post("/api/projects", response_model=ProjectResponse)
 def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
-    db_project = Project(**project.dict())
+    import json
+    project_dict = project.dict()
+    # assigneeをJSON文字列に変換
+    if project_dict.get("assignee"):
+        project_dict["assignee"] = json.dumps(project_dict["assignee"], ensure_ascii=False)
+    else:
+        project_dict["assignee"] = None
+    
+    db_project = Project(**project_dict)
     db.add(db_project)
     db.commit()
     db.refresh(db_project)
@@ -292,20 +325,42 @@ def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
     
     db.commit()
     db.refresh(db_project)
+    
+    # レスポンス用にassigneeをリストに変換
+    if db_project.assignee:
+        db_project.assignee = json.loads(db_project.assignee)
+    else:
+        db_project.assignee = []
+    
     return db_project
 
 @app.put("/api/projects/{project_id}", response_model=ProjectResponse)
 def update_project(project_id: int, project_update: ProjectUpdate, db: Session = Depends(get_db)):
+    import json
     db_project = db.query(Project).filter(Project.id == project_id).first()
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     
     update_data = project_update.dict(exclude_unset=True)
+    # assigneeをJSON文字列に変換
+    if "assignee" in update_data and update_data["assignee"] is not None:
+        update_data["assignee"] = json.dumps(update_data["assignee"], ensure_ascii=False)
+    
     for field, value in update_data.items():
         setattr(db_project, field, value)
     
     db.commit()
     db.refresh(db_project)
+    
+    # レスポンス用にassigneeをリストに変換
+    if db_project.assignee:
+        try:
+            db_project.assignee = json.loads(db_project.assignee)
+        except:
+            db_project.assignee = []
+    else:
+        db_project.assignee = []
+    
     return db_project
 
 @app.delete("/api/projects/{project_id}")
