@@ -15,7 +15,7 @@
 </script>
 
 <style lang="scss" scoped>
-@import '../styles/_color';
+@import '../styles/_theme';
 
 .dashboard {
   padding: 2rem;
@@ -28,15 +28,15 @@
 
   h2 {
     margin: 0;
-    color: $text-primary;
+    color: var(--current-textPrimary);
     font-size: 2rem;
   }
 }
 
 .dashboard-content {
-  background: $background-light;
+  background: var(--current-backgroundLight);
   border-radius: 8px;
   padding: 2rem;
-  box-shadow: $shadow-md;
+  box-shadow: 0 2px 8px var(--current-shadowMd);
 }
 </style>

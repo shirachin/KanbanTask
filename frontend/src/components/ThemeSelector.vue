@@ -21,7 +21,7 @@
           class="theme-swatch"
           :style="{ background: getThemeColor(themeName) }"
         ></span>
-        <span class="theme-name">{{ themeName.charAt(0).toUpperCase() + themeName.slice(1) }}</span>
+        <span class="theme-name">{{ getThemeDisplayName(themeName) }}</span>
       </button>
     </div>
   </div>
@@ -54,9 +54,16 @@ const getAvailableColorNames = (): string[] => {
   return Array.from(colorNameSet).sort()
 }
 
+// テーマの表示名を取得（CSS変数からnameを取得）
+const getThemeDisplayName = (themeName: string): string => {
+  const root = document.documentElement
+  const name = getComputedStyle(root).getPropertyValue(`--base-${themeName}-name`).trim()
+  return name || themeName.charAt(0).toUpperCase() + themeName.slice(1)
+}
+
 const availableThemes = ref<string[]>([])
 const showThemeMenu = ref(false)
-const selectedTheme = ref<string>('primary')
+const selectedTheme = ref<string>('lightRed')
 
 // テーマカラーを取得
 const getThemeColor = (themeName: string): string => {
@@ -67,18 +74,45 @@ const getThemeColor = (themeName: string): string => {
 // テーマを適用
 const applyTheme = () => {
   const root = document.documentElement
-  const themeColor = getComputedStyle(root).getPropertyValue(`--${selectedTheme.value}-50`).trim()
+  const themeName = selectedTheme.value
   
+  // 現在のテーマを設定
+  root.style.setProperty('--current-theme', themeName)
+  
+  // すべてのschema色を現在のテーマから取得して設定
+  const schemaKeys = [
+    'linkColor', 'linkHoverColor', 'activeBackground', 'backgroundLight',
+    'textPrimary', 'textSecondary', 'textWhite', 'borderColor',
+    'mainBackground', 'navBackground', 'headerBackground', 'footerBackground',
+    'hoverBackground', 'buttonBorderColor', 'buttonBackground',
+    'buttonHoverBackground', 'buttonHoverBorderColor', 'buttonFocusBorderColor',
+    'buttonFocusBackground', 'swatchBorderColor', 'paletteSectionBackground',
+    'paletteSectionShadow', 'paletteHeaderText', 'paletteHeaderSubText',
+    'paletteSectionBorder', 'paletteGridShadow', 'paletteCellBackground',
+    'paletteBaseColorBackground', 'paletteBaseColorText', 'paletteSwatchShadow',
+    'paletteSwatchHoverShadow', 'paletteSwatchBorder', 'paletteSwatchBorderShadow',
+    'tooltipBackground', 'tooltipBorder', 'tooltipShadow', 'tooltipText',
+    'shadowSm', 'shadowMd', 'shadowLg'
+  ]
+  
+  schemaKeys.forEach(key => {
+    const value = getComputedStyle(root).getPropertyValue(`--${themeName}-${key}`).trim()
+    if (value) {
+      root.style.setProperty(`--current-${key}`, value)
+    }
+  })
+  
+  // 互換性のためのテーマカラー変数
+  const themeColor = getComputedStyle(root).getPropertyValue(`--${themeName}-50`).trim()
   if (themeColor) {
-    // CSS変数でテーマカラーを設定
     root.style.setProperty('--theme-color', themeColor)
-    root.style.setProperty('--theme-hover', getComputedStyle(root).getPropertyValue(`--${selectedTheme.value}-49`).trim())
-    root.style.setProperty('--theme-gradient-start', getComputedStyle(root).getPropertyValue(`--${selectedTheme.value}-52`).trim())
-    root.style.setProperty('--theme-gradient-end', getComputedStyle(root).getPropertyValue(`--${selectedTheme.value}-48`).trim())
-    
-    // ローカルストレージに保存
-    localStorage.setItem('app-theme', selectedTheme.value)
+    root.style.setProperty('--theme-hover', getComputedStyle(root).getPropertyValue(`--${themeName}-49`).trim())
+    root.style.setProperty('--theme-gradient-start', getComputedStyle(root).getPropertyValue(`--${themeName}-52`).trim())
+    root.style.setProperty('--theme-gradient-end', getComputedStyle(root).getPropertyValue(`--${themeName}-48`).trim())
   }
+  
+  // ローカルストレージに保存
+  localStorage.setItem('app-theme', themeName)
 }
 
 // テーマメニューを開閉
@@ -120,7 +154,7 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '../styles/_color';
+@import '../styles/_theme';
 
 .theme-selector {
   position: relative;
@@ -132,16 +166,16 @@ onUnmounted(() => {
     align-items: center;
     justify-content: center;
     padding: 0.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid var(--current-buttonBorderColor);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    color: $text-white;
+    background: var(--current-buttonBackground);
+    color: var(--current-textWhite);
     cursor: pointer;
     transition: background-color 0.2s, border-color 0.2s, transform 0.1s;
 
     &:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.4);
+      background: var(--current-buttonHoverBackground);
+      border-color: var(--current-buttonHoverBorderColor);
     }
 
     &:active {
@@ -150,8 +184,8 @@ onUnmounted(() => {
 
     &:focus {
       outline: none;
-      border-color: rgba(255, 255, 255, 0.5);
-      background: rgba(255, 255, 255, 0.2);
+      border-color: var(--current-buttonFocusBorderColor);
+      background: var(--current-buttonFocusBackground);
     }
 
     .theme-icon {
@@ -161,7 +195,7 @@ onUnmounted(() => {
         'GRAD' 0,
         'opsz' 24;
       font-size: 1.5rem;
-      color: $text-white;
+      color: var(--current-textWhite);
       opacity: 0.9;
     }
   }
@@ -170,10 +204,10 @@ onUnmounted(() => {
     position: absolute;
     top: calc(100% + 0.5rem);
     right: 0;
-    background: $background-light;
-    border: 1px solid $border-color;
+    background: var(--current-backgroundLight);
+    border: 1px solid var(--current-borderColor);
     border-radius: 8px;
-    box-shadow: $shadow-lg;
+    box-shadow: 0 4px 16px var(--current-shadowLg);
     padding: 0.5rem;
     min-width: 200px;
     z-index: 1000;
@@ -190,26 +224,26 @@ onUnmounted(() => {
     border: none;
     border-radius: 6px;
     background: transparent;
-    color: $text-primary;
+    color: var(--current-textPrimary);
     cursor: pointer;
     transition: background-color 0.2s;
     text-align: left;
     width: 100%;
 
     &:hover {
-      background: $background-gray-hover;
+      background: var(--current-hoverBackground);
     }
 
     &.active {
-      background: var(--theme-color, $primary-color);
-      color: $text-white;
+      background: var(--current-activeBackground);
+      color: var(--current-textWhite);
     }
 
     .theme-swatch {
       width: 24px;
       height: 24px;
       border-radius: 4px;
-      border: 1px solid rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--current-swatchBorderColor);
       flex-shrink: 0;
     }
 

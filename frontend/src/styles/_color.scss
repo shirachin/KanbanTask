@@ -1,28 +1,23 @@
-$base-color: (
-    "primary": (
-        "lightness": 0.6469,
-        "chroma": 0.2745,
-        "hue": 30.18,
-    ),
-    "secondary": (
-        "lightness": 0.9,
-        "chroma": 0.15,
-        "hue": 260,
-    ),
-);
-
-// 色設定値参考
-// https://oklch.com
-
 @function calc-color($color-name, $lightnessLevel: 50) {
     // $color-name: 基準色の名前（"primary" または "secondary"）
     // $lightnessLevel: 明度レベル（0から100、50が基準色）
     
-    // 基準色を取得
-    $color-config: map-get($base-color, $color-name);
-    $hue: map-get($color-config, "hue");
-    $base-chroma: map-get($color-config, "chroma");
-    $base-lightness: map-get($color-config, "lightness");
+    // 基準色を取得（$themesから）
+    $color-config: map-get($themes, $color-name);
+    
+    // テーマが存在しない場合のエラーハンドリング
+    @if $color-config == null {
+        @error "テーマ '#{$color-name}' が $themes に定義されていません。利用可能なテーマ: #{map-keys($themes)}";
+    }
+    
+    // lchネストから値を取得
+    $lch-config: map-get($color-config, "lch");
+    @if $lch-config == null {
+        @error "テーマ '#{$color-name}' に 'lch' 設定がありません。新形式（lchネスト）で定義してください。";
+    }
+    $hue: map-get($lch-config, "hue");
+    $base-chroma: map-get($lch-config, "chroma");
+    $base-lightness: map-get($lch-config, "lightness");
 
     // レベルを0-1の範囲に正規化
     $t: 0;
@@ -62,55 +57,231 @@ $base-color: (
     @return oklch($l $c $hue);
 }
 
+// 透明度付きの色を計算する関数
+@function calc-color-alpha($color-name, $lightnessLevel: 50, $alpha: 1) {
+    // 基準色を取得（$themesから）
+    $color-config: map-get($themes, $color-name);
+    
+    @if $color-config == null {
+        @error "テーマ '#{$color-name}' が $themes に定義されていません。利用可能なテーマ: #{map-keys($themes)}";
+    }
+    
+    // lchネストから値を取得
+    $lch-config: map-get($color-config, "lch");
+    @if $lch-config == null {
+        @error "テーマ '#{$color-name}' に 'lch' 設定がありません。新形式（lchネスト）で定義してください。";
+    }
+    $hue: map-get($lch-config, "hue");
+    $base-chroma: map-get($lch-config, "chroma");
+    $base-lightness: map-get($lch-config, "lightness");
+
+    // レベルを0-1の範囲に正規化
+    $t: 0;
+    @if $lightnessLevel < 50 {
+        $t: (50 - $lightnessLevel) / 50;
+    } @else if $lightnessLevel > 50 {
+        $t: ($lightnessLevel - 50) / 50;
+    }
+
+    // 明度を計算
+    $l: $base-lightness;
+    @if $lightnessLevel < 50 {
+        $l: $base-lightness * (1 - $t);
+    } @else if $lightnessLevel > 50 {
+        $l: $base-lightness + (1.0 - $base-lightness) * $t;
+    }
+    
+    @if $l < 0 { $l: 0; }
+    @if $l > 1 { $l: 1; }
+
+    // 彩度を計算
+    $c: $base-chroma;
+    @if $lightnessLevel != 50 {
+        $c: $base-chroma * (1 - $t);
+    }
+    
+    @if $c < 0 { $c: 0; }
+    @if $c > 1 { $c: 1; }
+
+    // 透明度付きの色を返す
+    @return oklch($l $c $hue / $alpha);
+}
+
 @function calc-color-primary($lightnessLevel: 50) {
-    @return calc-color("primary", $lightnessLevel);
+    // 最初のテーマ（通常は"primary"または最初に定義されたテーマ）を使用
+    $first-theme: nth(map-keys($themes), 1);
+    @return calc-color($first-theme, $lightnessLevel);
 }
 
 @function calc-color-secondary($lightnessLevel: 50) {
     @return calc-color("secondary", $lightnessLevel);
 }
 
-// 基本カラー変数（既存のコードとの互換性のため）
-$primary-color: calc-color-primary(50);
-$primary-hover: calc-color-primary(49);
+// テーマの特定用途の色を取得（schemaマップから）
+// 値が数値の場合はcalc-colorで計算、色の値の場合はそのまま返す
+@function get-theme-schema-color($theme-name, $usage-name) {
+    $color-config: map-get($themes, $theme-name);
+    
+    @if $color-config == null {
+        @error "テーマ '#{$theme-name}' が $themes に定義されていません。利用可能なテーマ: #{map-keys($themes)}";
+    }
+    
+    $schema-config: map-get($color-config, "schema");
+    @if $schema-config == null {
+        @error "テーマ '#{$theme-name}' に 'schema' 設定がありません。";
+    }
+    
+    $value: map-get($schema-config, $usage-name);
+    @if $value == null {
+        @error "テーマ '#{$theme-name}' の 'schema' に '#{$usage-name}' が定義されていません。利用可能な用途: #{map-keys($schema-config)}";
+    }
+    
+    // 値の型をチェック
+    @if type-of($value) == number {
+        // 数値の場合はcalc-colorで計算（0-100のレベル値）
+        @return calc-color($theme-name, $value);
+    } @else if type-of($value) == color {
+        // 色の値（rgb, rgba, hex, hsl, hsla, oklchなど）の場合はそのまま返す
+        @return $value;
+    } @else {
+        // 文字列として色を解釈（例: "rgb(255, 0, 0)"）
+        // 注意: Sassでは文字列から色への直接変換はできないため、エラーを出す
+        @error "テーマ '#{$theme-name}' の 'schema' の '#{$usage-name}' の値 '#{$value}' は無効です。数値（0-100）または色の値（rgb, rgba, hex, hsl, hsla, oklchなど）を指定してください。";
+    }
+}
+
+// リンク色（CSS変数から取得、現在のテーマを使用）
+// 注意: SCSS変数はコンパイル時に決定されるため、CSS変数を直接使用する必要があります
+// 使用箇所で直接 var(--current-linkColor) を使用してください
+$link-color: var(--current-linkColor);
+$link-hover-color: var(--current-linkHoverColor);
+
+// アクティブ要素の背景色（CSS変数から取得、現在のテーマを使用）
+$active-background: var(--current-activeBackground);
+
+// グラデーション用（既存のコードとの互換性のため）
 $primary-gradient-start: calc-color-primary(52);
 $primary-gradient-end: calc-color-primary(48);
 
-// 背景色
-$background-dark: oklch(0.20 0.01 0deg);
-$background-light: oklch(1.0 0 0deg);
-$background-gray: oklch(0.97 0.005 0deg);
-$background-gray-hover: oklch(0.93 0.005 0deg);
+// 互換性のためのエイリアス（後方互換性のため）
+$primary-color: $link-color;
+$primary-hover: $link-hover-color;
 
-// テキスト色
-$text-primary: oklch(0.25 0.01 0deg);
-$text-secondary: oklch(0.45 0.01 0deg);
-$text-white: oklch(0.95 0 0deg);
+// 背景色（CSS変数から取得、現在のテーマを使用）
+$background-light: var(--current-backgroundLight);
 
-// ボーダー色
-$border-color: oklch(0.90 0.01 0deg);
+// テキスト色（CSS変数から取得、現在のテーマを使用）
+$text-primary: var(--current-textPrimary);
+$text-secondary: var(--current-textSecondary);
+$text-white: var(--current-textWhite);
 
-// シャドウ
-$shadow-sm: 0 2px 4px oklch(0 0 0deg / 0.1);
-$shadow-md: 0 2px 8px oklch(0 0 0deg / 0.1);
-$shadow-lg: 0 4px 16px oklch(0 0 0deg / 0.15);
-$shadow-primary: 0 5px 15px oklch(0.9 0.15 260deg / 0.4);
-$shadow-primary-sm: 0 2px 8px oklch(0.9 0.15 260deg / 0.3);
+// ボーダー色（CSS変数から取得、現在のテーマを使用）
+$border-color: var(--current-borderColor);
+
+// メイン背景色（CSS変数から取得、現在のテーマを使用）
+$main-background: var(--current-mainBackground);
+
+// ナビゲーション背景色（CSS変数から取得、現在のテーマを使用）
+$nav-background: var(--current-navBackground);
+
+// ヘッダー背景色（CSS変数から取得、現在のテーマを使用）
+$header-background: var(--current-headerBackground);
+
+// フッター背景色（CSS変数から取得、現在のテーマを使用）
+$footer-background: var(--current-footerBackground);
+
+// ホバー背景色（CSS変数から取得、現在のテーマを使用）
+$hover-background: var(--current-hoverBackground);
+
+// ボタン色（CSS変数から取得、現在のテーマを使用）
+$button-border-color: var(--current-buttonBorderColor);
+$button-background: var(--current-buttonBackground);
+$button-hover-background: var(--current-buttonHoverBackground);
+$button-hover-border-color: var(--current-buttonHoverBorderColor);
+$button-focus-border-color: var(--current-buttonFocusBorderColor);
+$button-focus-background: var(--current-buttonFocusBackground);
+
+// テーマスウォッチ色（CSS変数から取得、現在のテーマを使用）
+$swatch-border-color: var(--current-swatchBorderColor);
+
+// 色見本ページ用（CSS変数から取得、現在のテーマを使用）
+$palette-section-background: var(--current-paletteSectionBackground);
+$palette-section-shadow: var(--current-paletteSectionShadow);
+$palette-header-text: var(--current-paletteHeaderText);
+$palette-header-sub-text: var(--current-paletteHeaderSubText);
+$palette-section-border: var(--current-paletteSectionBorder);
+$palette-grid-shadow: var(--current-paletteGridShadow);
+$palette-cell-background: var(--current-paletteCellBackground);
+$palette-base-color-background: var(--current-paletteBaseColorBackground);
+$palette-base-color-text: var(--current-paletteBaseColorText);
+$palette-swatch-shadow: var(--current-paletteSwatchShadow);
+$palette-swatch-hover-shadow: var(--current-paletteSwatchHoverShadow);
+$palette-swatch-border: var(--current-paletteSwatchBorder);
+$palette-swatch-border-shadow: var(--current-paletteSwatchBorderShadow);
+$tooltip-background: var(--current-tooltipBackground);
+$tooltip-border: var(--current-tooltipBorder);
+$tooltip-shadow: var(--current-tooltipShadow);
+$tooltip-text: var(--current-tooltipText);
+
+// シャドウ（CSS変数から取得、現在のテーマを使用）
+$shadow-sm-color: var(--current-shadowSm);
+$shadow-md-color: var(--current-shadowMd);
+$shadow-lg-color: var(--current-shadowLg);
+
+$shadow-sm: 0 2px 4px $shadow-sm-color;
+$shadow-md: 0 2px 8px $shadow-md-color;
+$shadow-lg: 0 4px 16px $shadow-lg-color;
 
 // CSS変数としてエクスポート（JavaScriptから使用可能）
 :root {
-  // $base-colorマップから動的にグラデーションを生成
-  @each $color-name, $color-config in $base-color {
-    // 基準色の設定値をエクスポート
-    --base-#{$color-name}-hue: #{map-get($color-config, "hue")};
-    --base-#{$color-name}-chroma: #{map-get($color-config, "chroma")};
-    --base-#{$color-name}-lightness: #{map-get($color-config, "lightness")};
+  // デフォルトテーマ（最初のテーマ）を設定
+  $default-theme: nth(map-keys($themes), 1);
+  
+  // 現在のテーマ（デフォルトは最初のテーマ）
+  --current-theme: #{$default-theme};
+  
+  // $themesマップから動的にグラデーションを生成
+  @each $color-name, $color-config in $themes {
+    // lchネストから値を取得
+    $lch-config: map-get($color-config, "lch");
+    @if $lch-config == null {
+        @error "テーマ '#{$color-name}' に 'lch' 設定がありません。新形式（lchネスト）で定義してください。";
+    }
+    --base-#{$color-name}-hue: #{map-get($lch-config, "hue")};
+    --base-#{$color-name}-chroma: #{map-get($lch-config, "chroma")};
+    --base-#{$color-name}-lightness: #{map-get($lch-config, "lightness")};
+    --base-#{$color-name}-name: #{map-get($color-config, "name")};
 
     // グラデーション（0から100まで、すべてのレベルを生成）
     // 50が基準色、0が黒に近づく、100が白に近づく
     // 実際に使用する範囲はColorPalette.vueで制御
     @for $level from 0 through 100 {
       --#{$color-name}-#{$level}: #{calc-color($color-name, $level)};
+    }
+    
+    // schemaマップから用途別の色をエクスポート
+    $schema-config: map-get($color-config, "schema");
+    @if $schema-config != null {
+      @each $usage-name, $schema-value in $schema-config {
+        // 数値の場合はcalc-colorで計算、色の値（rgb, rgba, hex, hsl, hsla, oklchなど）の場合はそのまま使用
+        @if type-of($schema-value) == number {
+          --#{$color-name}-#{$usage-name}: #{calc-color($color-name, $schema-value)};
+        } @else if type-of($schema-value) == color {
+          --#{$color-name}-#{$usage-name}: #{$schema-value};
+        }
+      }
+    }
+  }
+  
+  // 現在のテーマに基づく色をCSS変数として設定（デフォルトは最初のテーマ）
+  @each $usage-name in ("linkColor", "linkHoverColor", "activeBackground", "backgroundLight", "textPrimary", "textSecondary", "textWhite", "borderColor", "mainBackground", "navBackground", "headerBackground", "footerBackground", "hoverBackground", "buttonBorderColor", "buttonBackground", "buttonHoverBackground", "buttonHoverBorderColor", "buttonFocusBorderColor", "buttonFocusBackground", "swatchBorderColor", "paletteSectionBackground", "paletteSectionShadow", "paletteHeaderText", "paletteHeaderSubText", "paletteSectionBorder", "paletteGridShadow", "paletteCellBackground", "paletteBaseColorBackground", "paletteBaseColorText", "paletteSwatchShadow", "paletteSwatchHoverShadow", "paletteSwatchBorder", "paletteSwatchBorderShadow", "tooltipBackground", "tooltipBorder", "tooltipShadow", "tooltipText", "shadowSm", "shadowMd", "shadowLg") {
+    $default-schema-value: map-get(map-get(map-get($themes, $default-theme), "schema"), $usage-name);
+    @if $default-schema-value != null {
+      @if type-of($default-schema-value) == number {
+        --current-#{$usage-name}: var(--#{$default-theme}-#{$usage-name});
+      } @else if type-of($default-schema-value) == color {
+        --current-#{$usage-name}: var(--#{$default-theme}-#{$usage-name});
+      }
     }
   }
 }

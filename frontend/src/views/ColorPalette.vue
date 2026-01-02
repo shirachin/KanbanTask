@@ -207,7 +207,7 @@ const hideTooltip = () => {
 </script>
 
 <style lang="scss" scoped>
-@import '../styles/_color';
+@import '../styles/_theme';
 
 $scale-cell-height: 50px;
 $scale-gap: 0.25rem;
@@ -223,14 +223,14 @@ $scale-gap: 0.25rem;
 
   h2 {
     margin: 0 0 0.5rem 0;
-    color: oklch(0.25 0.01 0deg);
+    color: var(--current-paletteHeaderText);
     font-size: 2rem;
     font-weight: 600;
   }
 
   p {
     margin: 0;
-    color: oklch(0.45 0.01 0deg);
+    color: var(--current-paletteHeaderSubText);
     font-size: 1rem;
   }
 }
@@ -242,17 +242,17 @@ $scale-gap: 0.25rem;
 }
 
 .color-section {
-  background: oklch(1.0 0 0deg);
+  background: var(--current-paletteSectionBackground);
   border-radius: 8px;
   padding: 2rem;
-  box-shadow: 0 2px 8px oklch(0 0 0deg / 0.1);
+  box-shadow: 0 2px 8px var(--current-paletteSectionShadow);
 
   h3 {
     margin: 0 0 1.5rem 0;
-    color: oklch(0.25 0.01 0deg);
+    color: var(--current-paletteHeaderText);
     font-size: 1.5rem;
     font-weight: 600;
-    border-bottom: 2px solid oklch(0.90 0.01 0deg);
+    border-bottom: 2px solid var(--current-paletteSectionBorder);
     padding-bottom: 0.75rem;
   }
 }
@@ -262,19 +262,19 @@ $scale-gap: 0.25rem;
   grid-template-columns: 150px 1fr 1fr;
   grid-auto-rows: auto;
   gap: $scale-gap;
-  background: oklch(1.0 0 0deg);
+  background: var(--current-paletteSectionBackground);
   padding: 1rem;
   border-radius: 8px;
-  box-shadow: 0 2px 4px oklch(0 0 0deg / 0.1);
+  box-shadow: 0 2px 4px var(--current-paletteGridShadow);
 }
 
 .gradient-header {
   font-weight: 700;
-  color: oklch(0.25 0.01 0deg);
+  color: $palette-header-text;
   font-size: 0.875rem;
   text-align: center;
   padding: 0.5rem;
-  background: oklch(0.97 0.005 0deg);
+  background: var(--current-paletteCellBackground);
   border-radius: 6px;
   display: flex;
   flex-direction: column;
@@ -288,7 +288,7 @@ $scale-gap: 0.25rem;
 .header-label-sub {
   font-size: 0.75rem;
   font-weight: 400;
-  color: oklch(0.45 0.01 0deg);
+  color: $palette-header-sub-text;
 }
 
 .gradient-step-cell {
@@ -299,14 +299,14 @@ $scale-gap: 0.25rem;
   border-radius: 6px;
   font-size: 0.875rem;
   font-weight: 600;
-  color: oklch(0.25 0.01 0deg);
-  background: oklch(0.97 0.005 0deg);
+  color: $palette-header-text;
+  background: var(--current-paletteCellBackground);
   box-sizing: border-box;
   min-height: $scale-cell-height;
 
   &.base-color {
-    background: calc-color-primary(50);
-    color: oklch(0.95 0 0deg);
+    background: var(--current-paletteBaseColorBackground);
+    color: var(--current-paletteBaseColorText);
   }
 }
 
@@ -329,19 +329,18 @@ $scale-gap: 0.25rem;
   height: 100%;
   min-height: $scale-cell-height;
   border-radius: 4px;
-  box-shadow: 0 2px 4px oklch(0 0 0deg / 0.1);
+  box-shadow: 0 2px 4px var(--current-paletteSwatchShadow);
   transition: transform 0.2s, box-shadow 0.2s;
   cursor: pointer;
 
   &:hover {
     transform: scale(1.05);
-    box-shadow: 0 2px 8px oklch(0 0 0deg / 0.1);
+    box-shadow: 0 2px 8px var(--current-paletteSwatchHoverShadow);
   }
 
   &.base-color-swatch {
-    border: 2px solid calc-color-primary(50);
-    // 基準色のoklch値に透明度を追加（hue: 260, chroma: 0.15, lightness: 0.9）
-    box-shadow: 0 2px 8px oklch(0.9 0.15 260deg / 0.3);
+    border: 2px solid var(--current-paletteSwatchBorder);
+    box-shadow: 0 2px 8px var(--current-paletteSwatchBorderShadow);
   }
 }
 
@@ -352,14 +351,14 @@ $scale-gap: 0.25rem;
   padding: 0.5rem;
   border-radius: 6px;
   font-size: 0.875rem;
-  color: oklch(0.25 0.01 0deg);
+  color: $palette-header-text;
   box-sizing: border-box;
   min-height: $scale-cell-height;
 
   &.code {
     font-family: 'Courier New', monospace;
     font-size: 0.75rem;
-    color: oklch(0.45 0.01 0deg);
+    color: var(--current-paletteHeaderSubText);
     word-break: break-all;
     text-align: center;
   }
@@ -370,11 +369,11 @@ $scale-gap: 0.25rem;
   position: fixed;
   z-index: 1000;
   pointer-events: none;
-  background: oklch(0.20 0.01 0deg);
-  border: 1px solid oklch(0.90 0.01 0deg);
+  background: var(--current-tooltipBackground);
+  border: 1px solid var(--current-tooltipBorder);
   border-radius: 6px;
   padding: 0.75rem;
-  box-shadow: 0 4px 16px oklch(0 0 0deg / 0.15);
+  box-shadow: 0 4px 16px var(--current-tooltipShadow);
   min-width: 200px;
 }
 
@@ -393,13 +392,13 @@ $scale-gap: 0.25rem;
 
 .tooltip-label {
   font-weight: 600;
-  color: oklch(0.95 0 0deg);
+  color: var(--current-tooltipText);
   font-size: 0.875rem;
   white-space: nowrap;
 }
 
 .tooltip-value {
-  color: oklch(0.95 0 0deg);
+  color: var(--current-tooltipText);
   font-size: 0.875rem;
   text-align: right;
   word-break: break-all;

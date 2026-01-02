@@ -1,28 +1,229 @@
-@import './_color';
-
 // テーマ設定
+// 色設定値参考
+// https://oklch.com
 $themes: (
-  "primary": (
-    "name": "Primary",
-    "color": $primary-color,
+  "lightRed": (
+    "name": "Light Red",
+    "lch": (
+      "lightness": 0.6469,
+      "chroma": 0.2745,
+      "hue": 30.18,
+    ),
+    "schema": (
+      // 背景色
+      "headerBackground": 60,  // App.vue .header の背景色
+      "mainBackground": 98,  // App.vue .main の背景色
+      "navBackground": 95,  // App.vue .nav の背景色
+      "footerBackground": 95,  // App.vue .footer の背景色
+      "backgroundLight": 100,  // style.scss :root, ThemeSelector.vue .theme-menu, Dashboard.vue の背景色
+      
+      // ホバー色
+      "hoverBackground": 60,  // App.vue .nav-link:hover, ThemeSelector.vue .theme-option:hover の背景色
+      
+      // テキスト色
+      "textPrimary": 20,  // App.vue .nav-link, ThemeSelector.vue .theme-option, style.scss :root, Dashboard.vue のテキスト色
+      "textSecondary": 40,  // App.vue .footer, .version のテキスト色
+      "textWhite": 98,  // App.vue .header, .nav-toggle-button, .nav-link.active, ThemeSelector.vue のテキスト色
+      
+      // ボーダー色
+      "borderColor": 85,  // App.vue .nav, .footer, ThemeSelector.vue .theme-menu のボーダー色
+      
+      // リンク色
+      "linkColor": 50,  // style.scss a の色
+      "linkHoverColor": 49,  // style.scss a:hover の色
+      
+      // アクティブ要素の背景色
+      "activeBackground": 50,  // App.vue .nav-link.active, ThemeSelector.vue .theme-option.active の背景色
+      
+      // ボタン色（ヘッダーボタン、テーマボタン用）
+      "buttonBorderColor": rgba(255, 255, 255, 0.3),  // App.vue .nav-toggle-button, ThemeSelector.vue .theme-icon-button のボーダー色
+      "buttonBackground": rgba(255, 255, 255, 0.1),  // App.vue .nav-toggle-button, ThemeSelector.vue .theme-icon-button の背景色
+      "buttonHoverBackground": rgba(255, 255, 255, 0.15),  // App.vue .nav-toggle-button:hover, ThemeSelector.vue .theme-icon-button:hover の背景色
+      "buttonHoverBorderColor": rgba(255, 255, 255, 0.4),  // App.vue .nav-toggle-button:hover, ThemeSelector.vue .theme-icon-button:hover のボーダー色
+      "buttonFocusBorderColor": rgba(255, 255, 255, 0.5),  // App.vue .nav-toggle-button:focus, ThemeSelector.vue .theme-icon-button:focus のボーダー色
+      "buttonFocusBackground": rgba(255, 255, 255, 0.2),  // App.vue .nav-toggle-button:focus, ThemeSelector.vue .theme-icon-button:focus の背景色
+      
+      // テーマスウォッチ色
+      "swatchBorderColor": rgba(0, 0, 0, 0.1),  // ThemeSelector.vue .theme-swatch のボーダー色
+      
+      // 色見本ページ用
+      "paletteSectionBackground": 100,  // ColorPalette.vue .color-section, .gradient-grid の背景色
+      "paletteSectionShadow": oklch(0 0 0deg / 0.1),  // ColorPalette.vue .color-section の box-shadow
+      "paletteHeaderText": 20,  // ColorPalette.vue .palette-header h2, .color-section h3, .gradient-header, .gradient-step-cell, .gradient-param-cell のテキスト色
+      "paletteHeaderSubText": 40,  // ColorPalette.vue .header-label-sub, .gradient-param-cell.code のテキスト色
+      "paletteSectionBorder": 85,  // ColorPalette.vue .color-section h3 の border-bottom 色
+      "paletteGridShadow": oklch(0 0 0deg / 0.1),  // ColorPalette.vue .gradient-grid の box-shadow
+      "paletteCellBackground": 97,  // ColorPalette.vue .gradient-header, .gradient-step-cell の背景色
+      "paletteBaseColorBackground": 50,  // ColorPalette.vue .gradient-step-cell.base-color の背景色
+      "paletteBaseColorText": 98,  // ColorPalette.vue .gradient-step-cell.base-color のテキスト色
+      "paletteSwatchShadow": oklch(0 0 0deg / 0.1),  // ColorPalette.vue .gradient-swatch の box-shadow
+      "paletteSwatchHoverShadow": oklch(0 0 0deg / 0.1),  // ColorPalette.vue .gradient-swatch:hover の box-shadow
+      "paletteSwatchBorder": 50,  // ColorPalette.vue .gradient-swatch.base-color-swatch のボーダー色
+      "paletteSwatchBorderShadow": oklch(0.9 0.15 260deg / 0.3),  // ColorPalette.vue .gradient-swatch.base-color-swatch の box-shadow
+      "tooltipBackground": 20,  // ColorPalette.vue .tooltip の背景色
+      "tooltipBorder": 85,  // ColorPalette.vue .tooltip のボーダー色
+      "tooltipShadow": oklch(0 0 0deg / 0.15),  // ColorPalette.vue .tooltip の box-shadow
+      "tooltipText": 98,  // ColorPalette.vue .tooltip-label, .tooltip-value のテキスト色
+      
+      // シャドウ色（透明度は固定）
+      "shadowSm": oklch(0 0 0deg / 0.1),  // App.vue .header の box-shadow
+      "shadowMd": oklch(0 0 0deg / 0.1),  // Dashboard.vue の box-shadow
+      "shadowLg": oklch(0 0 0deg / 0.15),  // ThemeSelector.vue .theme-menu の box-shadow
+    ),
+  ),
+  "lightYellow": (
+    "name": "Light Yellow",
+    "lch": (
+      "lightness": 0.968,
+      "chroma": 0.211,
+      "hue": 109.77,
+    ),
+    "schema": (
+      // 背景色
+      "headerBackground": 90,
+      "mainBackground": 98,
+      "navBackground": 95,
+      "footerBackground": 95,
+      "backgroundLight": 100,
+      
+      // ホバー色
+      "hoverBackground": 90,
+      
+      // テキスト色
+      "textPrimary": 20,
+      "textSecondary": 40,
+      "textWhite": 98,
+      
+      // ボーダー色
+      "borderColor": 85,
+      
+      // リンク色
+      "linkColor": 50,
+      "linkHoverColor": 49,
+      
+      // アクティブ要素の背景色
+      "activeBackground": 50,
+      
+      // ボタン色（ヘッダーボタン、テーマボタン用）
+      "buttonBorderColor": rgba(255, 255, 255, 0.3),
+      "buttonBackground": rgba(255, 255, 255, 0.1),
+      "buttonHoverBackground": rgba(255, 255, 255, 0.15),
+      "buttonHoverBorderColor": rgba(255, 255, 255, 0.4),
+      "buttonFocusBorderColor": rgba(255, 255, 255, 0.5),
+      "buttonFocusBackground": rgba(255, 255, 255, 0.2),
+      
+      // テーマスウォッチ色
+      "swatchBorderColor": rgba(0, 0, 0, 0.1),
+      
+      // 色見本ページ用
+      "paletteSectionBackground": 100,
+      "paletteSectionShadow": oklch(0 0 0deg / 0.1),
+      "paletteHeaderText": 20,
+      "paletteHeaderSubText": 40,
+      "paletteSectionBorder": 85,
+      "paletteGridShadow": oklch(0 0 0deg / 0.1),
+      "paletteCellBackground": 97,
+      "paletteBaseColorBackground": 50,
+      "paletteBaseColorText": 98,
+      "paletteSwatchShadow": oklch(0 0 0deg / 0.1),
+      "paletteSwatchHoverShadow": oklch(0 0 0deg / 0.1),
+      "paletteSwatchBorder": 50,
+      "paletteSwatchBorderShadow": oklch(0.9 0.15 260deg / 0.3),
+      "tooltipBackground": 20,
+      "tooltipBorder": 85,
+      "tooltipShadow": oklch(0 0 0deg / 0.15),
+      "tooltipText": 98,
+      
+      // シャドウ色（透明度は固定）
+      "shadowSm": oklch(0 0 0deg / 0.1),
+      "shadowMd": oklch(0 0 0deg / 0.1),
+      "shadowLg": oklch(0 0 0deg / 0.15),
+    ),
   ),
   "secondary": (
     "name": "Secondary",
-    "color": calc-color-secondary(50),
+    "lch": (
+      "lightness": 0.9,
+      "chroma": 0.15,
+      "hue": 260,
+    ),
+    "schema": (
+      // 背景色
+      "headerBackground": 80,
+      "mainBackground": 98,
+      "navBackground": 95,
+      "footerBackground": 95,
+      "backgroundLight": 100,
+      
+      // ホバー色
+      "hoverBackground": 80,
+      
+      // テキスト色
+      "textPrimary": 20,
+      "textSecondary": 40,
+      "textWhite": 98,
+      
+      // ボーダー色
+      "borderColor": 85,
+      
+      // リンク色
+      "linkColor": 50,
+      "linkHoverColor": 49,
+      
+      // アクティブ要素の背景色
+      "activeBackground": 50,
+      
+      // ボタン色（ヘッダーボタン、テーマボタン用）
+      "buttonBorderColor": rgba(255, 255, 255, 0.3),
+      "buttonBackground": rgba(255, 255, 255, 0.1),
+      "buttonHoverBackground": rgba(255, 255, 255, 0.15),
+      "buttonHoverBorderColor": rgba(255, 255, 255, 0.4),
+      "buttonFocusBorderColor": rgba(255, 255, 255, 0.5),
+      "buttonFocusBackground": rgba(255, 255, 255, 0.2),
+      
+      // テーマスウォッチ色
+      "swatchBorderColor": rgba(0, 0, 0, 0.1),
+      
+      // 色見本ページ用
+      "paletteSectionBackground": 100,
+      "paletteSectionShadow": oklch(0 0 0deg / 0.1),
+      "paletteHeaderText": 20,
+      "paletteHeaderSubText": 40,
+      "paletteSectionBorder": 85,
+      "paletteGridShadow": oklch(0 0 0deg / 0.1),
+      "paletteCellBackground": 97,
+      "paletteBaseColorBackground": 50,
+      "paletteBaseColorText": 98,
+      "paletteSwatchShadow": oklch(0 0 0deg / 0.1),
+      "paletteSwatchHoverShadow": oklch(0 0 0deg / 0.1),
+      "paletteSwatchBorder": 50,
+      "paletteSwatchBorderShadow": oklch(0.9 0.15 260deg / 0.3),
+      "tooltipBackground": 20,
+      "tooltipBorder": 85,
+      "tooltipShadow": oklch(0 0 0deg / 0.15),
+      "tooltipText": 98,
+      
+      // シャドウ色（透明度は固定）
+      "shadowSm": oklch(0 0 0deg / 0.1),
+      "shadowMd": oklch(0 0 0deg / 0.1),
+      "shadowLg": oklch(0 0 0deg / 0.15),
+    ),
   ),
 );
 
+@import './_color';
+
 // 現在のテーマを取得する関数
-@function get-theme-color($theme-name: "primary") {
-  $theme: map-get($themes, $theme-name);
-  @if $theme {
-    @return map-get($theme, "color");
+@function get-theme-color($theme-name: null) {
+  @if $theme-name == null {
+    // デフォルトは最初のテーマ
+    $theme-name: nth(map-keys($themes), 1);
   }
-  @return $primary-color; // デフォルト
+  @return calc-color($theme-name, 50);
 }
 
-// テーマカラー変数
-$theme-color: get-theme-color("primary");
-$theme-hover: calc-color-primary(49);
+// テーマカラー変数（schemaマップから取得、最初のテーマを使用）
+$theme-color: get-theme-color();
+$theme-hover: get-theme-schema-color(nth(map-keys($themes), 1), "linkHoverColor");
 $theme-gradient-start: calc-color-primary(52);
 $theme-gradient-end: calc-color-primary(48);

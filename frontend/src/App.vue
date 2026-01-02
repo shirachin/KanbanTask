@@ -85,7 +85,6 @@ const toggleNav = () => {
 </script>
 
 <style lang="scss" scoped>
-@import './styles/_color';
 @import './styles/_theme';
 
 .app {
@@ -111,10 +110,10 @@ const toggleNav = () => {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: linear-gradient(135deg, var(--theme-gradient-start, $primary-gradient-start) 0%, var(--theme-gradient-end, $primary-gradient-end) 100%);
-  color: $text-white;
+  background: var(--current-headerBackground);
+  color: var(--current-textWhite);
   padding: 0.75rem 1.5rem;
-  box-shadow: $shadow-sm;
+  box-shadow: 0 2px 4px var(--current-shadowSm);
 }
 
 .header-content {
@@ -128,16 +127,16 @@ const toggleNav = () => {
     align-items: center;
     justify-content: center;
     padding: 0.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid var(--current-buttonBorderColor);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    color: $text-white;
+    background: var(--current-buttonBackground);
+    color: var(--current-textWhite);
     cursor: pointer;
     transition: background-color 0.2s, border-color 0.2s, transform 0.1s;
 
     &:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.4);
+      background: var(--current-buttonHoverBackground);
+      border-color: var(--current-buttonHoverBorderColor);
     }
 
     &:active {
@@ -146,8 +145,8 @@ const toggleNav = () => {
 
     &:focus {
       outline: none;
-      border-color: rgba(255, 255, 255, 0.5);
-      background: rgba(255, 255, 255, 0.2);
+      border-color: var(--current-buttonFocusBorderColor);
+      background: var(--current-buttonFocusBackground);
     }
 
     .nav-toggle-icon {
@@ -157,7 +156,7 @@ const toggleNav = () => {
         'GRAD' 0,
         'opsz' 24;
       font-size: 1.5rem;
-      color: $text-white;
+      color: var(--current-textWhite);
       opacity: 0.9;
     }
   }
@@ -172,8 +171,8 @@ const toggleNav = () => {
 
 .nav {
   grid-area: nav;
-  background: $background-gray;
-  border-right: 1px solid $border-color;
+  background: var(--current-navBackground);
+  border-right: 1px solid var(--current-borderColor);
   padding: 1rem 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -197,17 +196,17 @@ const toggleNav = () => {
 .nav-link {
   display: block;
   padding: 0.75rem 1.5rem;
-  color: $text-primary;
+  color: var(--current-textPrimary);
   text-decoration: none;
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: $background-gray-hover;
+    background-color: var(--current-hoverBackground);
   }
 
   &:active,
   &.active {
-    background-color: var(--theme-color, $primary-color);
+    background-color: var(--current-activeBackground);
     color: $text-white;
   }
 }
@@ -218,18 +217,18 @@ const toggleNav = () => {
   overflow-y: auto;
   overflow-x: hidden;
   height: 100%;
-  background: $background-light;
+  background: var(--current-mainBackground);
 }
 
 .footer {
   grid-area: footer;
-  background: $background-gray;
-  border-top: 1px solid $border-color;
+  background: var(--current-footerBackground);
+  border-top: 1px solid var(--current-borderColor);
   padding: 0.5rem 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: $text-secondary;
+  color: var(--current-textSecondary);
   font-size: 0.875rem;
 
   p {
@@ -247,7 +246,7 @@ const toggleNav = () => {
   align-items: center;
   justify-content: center;
   min-height: 400px;
-  color: $text-secondary;
+  color: var(--current-textSecondary);
   font-size: 1.2rem;
 }
 </style>
