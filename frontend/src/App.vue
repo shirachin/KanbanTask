@@ -1,12 +1,22 @@
 <template>
-  <div class="app">
+  <div class="app" :class="{ 'nav-collapsed': !navOpen }">
     <header class="header">
       <div class="header-content">
+        <button 
+          type="button"
+          class="nav-toggle-button"
+          @click="toggleNav"
+          :aria-label="navOpen ? 'ナビゲーションを閉じる' : 'ナビゲーションを開く'"
+        >
+          <span class="material-symbols-outlined nav-toggle-icon">
+            {{ navOpen ? 'menu_open' : 'menu' }}
+          </span>
+        </button>
         <h1>タスク管理アプリ</h1>
         <ThemeSelector />
       </div>
     </header>
-    <nav class="nav">
+    <nav class="nav" :class="{ 'nav-collapsed': !navOpen }">
       <ul class="nav-list">
         <li>
           <a 
@@ -62,9 +72,14 @@ import ThemeSelector from './components/ThemeSelector.vue'
 type ViewType = 'dashboard' | 'kanban' | 'color-palette'
 
 const currentView = ref<ViewType>('dashboard')
+const navOpen = ref(true)
 
 const switchView = (view: ViewType) => {
   currentView.value = view
+}
+
+const toggleNav = () => {
+  navOpen.value = !navOpen.value
 }
 </script>
 
@@ -82,6 +97,11 @@ const switchView = (view: ViewType) => {
     "footer footer";
   grid-template-columns: 200px 1fr;
   grid-template-rows: auto 1fr auto;
+  transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app.nav-collapsed {
+  grid-template-columns: 0 1fr;
 }
 
 .header {
@@ -96,12 +116,52 @@ const switchView = (view: ViewType) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 2rem;
+  gap: 1rem;
+
+  .nav-toggle-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    color: $text-white;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, transform 0.1s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    &:focus {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .nav-toggle-icon {
+      font-variation-settings:
+        'FILL' 0,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 24;
+      font-size: 1.5rem;
+      color: $text-white;
+      opacity: 0.9;
+    }
+  }
 
   h1 {
     margin: 0;
     font-size: 1.8rem;
     font-weight: 600;
+    flex: 1;
   }
 }
 
@@ -110,6 +170,15 @@ const switchView = (view: ViewType) => {
   background: $background-gray;
   border-right: 1px solid $border-color;
   padding: 1rem 0;
+  overflow: hidden;
+  width: 200px;
+  min-width: 200px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(0);
+
+  &.nav-collapsed {
+    transform: translateX(-100%);
+  }
 }
 
 .nav-list {
