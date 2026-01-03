@@ -201,7 +201,6 @@ def read_root():
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
 def get_tasks(project_id: int = None, project_ids: str = None, assignee: str = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    print(f"get_tasks called with project_id={project_id}, project_ids={project_ids}, assignee={assignee}")
     # status_idで並べ替え、同じstatus_id内ではorderで並べ替え
     from sqlalchemy import nullslast
     query = db.query(Task)
@@ -209,10 +208,6 @@ def get_tasks(project_id: int = None, project_ids: str = None, assignee: str = N
         query = query.filter(Task.project_id == project_id)
         # assigneeが指定されている場合は、そのプロジェクトのタスクでassigneeが一致するもののみ
         if assignee:
-            if project_id == -1:
-                print(f"Filtering for project_id=-1 and assignee={assignee}")
-            else:
-                print(f"Filtering for project_id={project_id} and assignee={assignee}")
             query = query.filter(Task.assignee == assignee)
     elif project_ids:
         # カンマ区切りのプロジェクトIDリスト
@@ -225,7 +220,6 @@ def get_tasks(project_id: int = None, project_ids: str = None, assignee: str = N
                 if other_project_ids:
                     if assignee:
                         # -1以外のプロジェクトIDでassigneeが一致するタスクと、-1かつassigneeが一致するタスク
-                        print(f"Filtering for project_ids={other_project_ids} with assignee={assignee} OR project_id=-1 with assignee={assignee}")
                         query = query.filter(
                             ((Task.project_id.in_(other_project_ids)) & (Task.assignee == assignee)) |
                             ((Task.project_id == -1) & (Task.assignee == assignee))
@@ -238,7 +232,6 @@ def get_tasks(project_id: int = None, project_ids: str = None, assignee: str = N
                 else:
                     # -1のみの場合
                     if assignee:
-                        print(f"Filtering for project_id=-1 with assignee={assignee}")
                         query = query.filter((Task.project_id == -1) & (Task.assignee == assignee))
                     else:
                         query = query.filter(Task.project_id == -1)
@@ -258,23 +251,6 @@ def get_tasks(project_id: int = None, project_ids: str = None, assignee: str = N
         nullslast(Task.status_id),
         Task.order
     ).offset(skip).limit(limit).all()
-    print(f"Returning {len(tasks)} tasks")
-    # デバッグ用：最初の数件のタスク情報を出力
-    if len(tasks) > 0:
-        for i, task in enumerate(tasks[:3]):
-            print(f"Task {i}: id={task.id}, project_id={task.project_id}, assignee={task.assignee}, title={task.title}")
-    else:
-        # タスクが0件の場合、条件に合うタスクが存在するか確認
-        test_query = db.query(Task).filter(Task.project_id == -1)
-        all_personal_tasks = test_query.all()
-        print(f"Total personal tasks (project_id=-1): {len(all_personal_tasks)}")
-        if assignee:
-            test_query_with_assignee = db.query(Task).filter(Task.project_id == -1, Task.assignee == assignee)
-            matching_tasks = test_query_with_assignee.all()
-            print(f"Personal tasks with assignee={assignee}: {len(matching_tasks)}")
-            if len(matching_tasks) > 0:
-                for task in matching_tasks[:3]:
-                    print(f"  - Task id={task.id}, assignee={task.assignee}, title={task.title}")
     return tasks
 
 @app.get("/api/tasks/{task_id}", response_model=TaskResponse)
@@ -424,7 +400,6 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 @app.get("/api/statuses", response_model=List[StatusResponse])
 def get_statuses(project_id: int = None, db: Session = Depends(get_db)):
     try:
-        print(f"get_statuses called with project_id={project_id}")
         # project_id=-1の場合は個人タスク用のデフォルトステータスを返す
         if project_id == -1:
             # 個人タスク用のデフォルトステータス（仮想的なIDを使用）
@@ -439,14 +414,12 @@ def get_statuses(project_id: int = None, db: Session = Depends(get_db)):
                 {"id": -7, "name": "cancelled", "display_name": "中止", "order": 6, "color": "#dc3545", "project_id": -1, "created_at": datetime.now()}
             ]
             result = [StatusResponse(**status) for status in default_statuses]
-            print(f"Returning {len(result)} default statuses for project_id=-1")
             return result
         
         query = db.query(Status)
         if project_id is not None:
             query = query.filter(Status.project_id == project_id)
         statuses = query.order_by(Status.order).all()
-        print(f"Returning {len(statuses)} statuses from database for project_id={project_id}")
         return statuses
     except Exception as e:
         import traceback

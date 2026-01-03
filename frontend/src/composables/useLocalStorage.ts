@@ -7,11 +7,9 @@ export const getLocalStorage = <T>(key: string, defaultValue: T): T => {
   try {
     const item = localStorage.getItem(key)
     if (item === null) {
-      console.log(`LocalStorage not found: ${key}, using default:`, defaultValue)
       return defaultValue
     }
     const parsed = JSON.parse(item) as T
-    console.log(`LocalStorage loaded: ${key}`, parsed)
     return parsed
   } catch (e) {
     console.error(`Error reading from localStorage key "${key}":`, e)
@@ -24,11 +22,9 @@ export const setLocalStorage = <T>(key: string, value: T): void => {
   try {
     if (value === null || value === undefined) {
       localStorage.removeItem(key)
-      console.log(`LocalStorage removed: ${key}`)
     } else {
       const serialized = JSON.stringify(value)
       localStorage.setItem(key, serialized)
-      console.log(`LocalStorage saved: ${key}`, value)
     }
   } catch (e) {
     console.error(`Error writing to localStorage key "${key}":`, e)

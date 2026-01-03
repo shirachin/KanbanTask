@@ -200,7 +200,7 @@ const selectedProjectName = ref<string>('')
 
 const { projects, loading: projectsLoading, error: projectsError, fetchProjects } = useProjects()
 const { tasks, loading: tasksLoading, error: tasksError, fetchTasks, createTask, updateTask } = useTasks()
-const { todos, fetchTodos, createTodo, updateTodo, deleteTodo, getTodos } = useTodos()
+const { fetchTodos, createTodo, deleteTodo, getTodos } = useTodos()
 
 const showTaskModal = ref(false)
 const showTaskEditModal = ref(false)
@@ -318,14 +318,6 @@ const handleTodoBlur = (taskId: number) => {
   }
 }
 
-// TODOの完了状態を切り替え（無効化：完了状態は実行完了日で自動管理）
-// const toggleTodo = async (todoId: number, completed: boolean) => {
-//   try {
-//     await updateTodo(todoId, { completed })
-//   } catch (e) {
-//     console.error('Error toggling todo:', e)
-//   }
-// }
 
 // TODOを削除
 const deleteTodoItem = async (todoId: number) => {
@@ -426,12 +418,10 @@ const fetchStatuses = async (projectId: number) => {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
     const data = await response.json()
-    console.log('Fetched statuses:', data)
     if (data && Array.isArray(data) && data.length > 0) {
       statuses.value = data.sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
     } else {
       // デフォルトステータスを使用（project_id=-1の場合など）
-      console.log('Using default statuses for project_id:', projectId)
       statuses.value = [
         { id: -1, name: 'considering', display_name: '検討中', order: 0, color: '#9e9e9e', project_id: projectId },
         { id: -2, name: 'not_started', display_name: '未実行', order: 1, color: '#667eea', project_id: projectId },
@@ -590,18 +580,11 @@ const loadTasks = async () => {
       assignee = currentUser.value || undefined
     }
     
-    console.log('Loading tasks for project IDs:', displayProjectIds.value, 'assignee:', assignee)
-    console.log('Selected project mode:', selectedProjectMode.value)
-    console.log('My projects:', myProjects.value.map((p: Project) => ({ id: p.id, name: p.name })))
-    
     if (displayProjectIds.value.length === 1) {
       await fetchTasks(displayProjectIds.value[0], undefined, assignee)
     } else {
       await fetchTasks(undefined, displayProjectIds.value, assignee)
     }
-    
-    console.log('Loaded tasks:', tasks.value.length)
-    console.log('Loaded task details:', tasks.value.map((t: Task) => ({ id: t.id, project_id: t.project_id, assignee: t.assignee, title: t.title })))
     
     // 各タスクのTODOを取得
     for (const task of tasks.value) {
@@ -627,7 +610,6 @@ const loadTasks = async () => {
       await fetchStatuses(statusProjectId)
     }
     
-    console.log('Loaded statuses:', statuses.value.length)
   } catch (e) {
     console.error('Error in loadTasks:', e)
   }

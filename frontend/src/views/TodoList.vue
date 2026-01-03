@@ -71,7 +71,6 @@ const gridRef = ref<InstanceType<typeof AgGridVue> | null>(null)
 // ページネーションサイズ
 const savedPageSize = getLocalStorage<number>(STORAGE_KEYS.TODO_LIST_PAGE_SIZE, 50)
 const paginationPageSize = ref<number>([25, 50, 100, 200].includes(savedPageSize) ? savedPageSize : 50)
-console.log('Initializing paginationPageSize:', paginationPageSize.value)
 
 // 初期化フラグ（初期化時のイベントを無視するため）
 const isInitializing = ref(true)
@@ -79,7 +78,6 @@ const isInitializing = ref(true)
 // カラム状態（ソート、表示/非表示、幅など）
 const savedColumnState = getLocalStorage<ColumnState[]>(STORAGE_KEYS.TODO_LIST_COLUMN_STATE, [])
 const columnState = ref<ColumnState[]>(savedColumnState)
-console.log('Initializing columnState:', columnState.value)
 
 // ソートモデル（ソート状態を保存するため）
 interface SortModel {
@@ -88,12 +86,10 @@ interface SortModel {
 }
 const savedSortModel = getLocalStorage<SortModel[]>(STORAGE_KEYS.TODO_LIST_SORT_MODEL, [])
 const sortModel = ref<SortModel[]>(savedSortModel)
-console.log('Initializing sortModel:', sortModel.value)
 
 // フィルタモデル
 const savedFilterModel = getLocalStorage<FilterModel>(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, {})
 const filterModel = ref<FilterModel>(savedFilterModel)
-console.log('Initializing filterModel:', filterModel.value)
 
 // フィルタテンプレートの定義
 interface FilterTemplate {
@@ -134,42 +130,35 @@ const applyFilterTemplate = (template: FilterTemplate) => {
           state: sortColumnState,
           applyOrder: false
         })
-        console.log('Applied sort model from template:', template.sortModel)
       }
       
       // LocalStorageに保存（テンプレート適用時も確実に保存）
       sortModel.value = template.sortModel
       setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, template.sortModel)
-      console.log('Sort model saved to LocalStorage from template:', template.sortModel)
     } else {
       // ソートをクリア
       sortModel.value = []
       setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, null)
-      console.log('Sort model cleared from template')
     }
     
     // フィルタモデルを適用（指定されている場合）
     if (template.filterModel && Object.keys(template.filterModel).length > 0) {
       if (typeof gridRef.value.api.setFilterModel === 'function') {
         gridRef.value.api.setFilterModel(template.filterModel)
-        console.log('Applied filter model from template:', template.filterModel)
       }
       
       // LocalStorageに保存（テンプレート適用時も確実に保存）
       filterModel.value = template.filterModel
       setLocalStorage(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, template.filterModel)
-      console.log('Filter model saved to LocalStorage from template:', template.filterModel)
     } else {
       // フィルタをクリア
       if (typeof gridRef.value.api.setFilterModel === 'function') {
         gridRef.value.api.setFilterModel({})
-        console.log('Filter model cleared from template')
       }
       
       // LocalStorageにも保存
       filterModel.value = {}
       setLocalStorage(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, null)
-      console.log('Filter model cleared in LocalStorage from template')
     }
     
     // AG Gridに状態変更を通知して再描画を促す
@@ -182,7 +171,6 @@ const applyFilterTemplate = (template: FilterTemplate) => {
     // イベントハンドラーが動作するように、少し遅延させてからisInitializingをfalseにする
     setTimeout(() => {
       isInitializing.value = false
-      console.log('Filter template applied. Initialization complete.')
     }, 300)
   }
 }
@@ -203,7 +191,6 @@ const onColumnStateChanged = () => {
   
   columnState.value = relevantState
   setLocalStorage(STORAGE_KEYS.TODO_LIST_COLUMN_STATE, relevantState.length > 0 ? relevantState : null)
-  console.log('Column state saved:', relevantState)
   
   // ソートモデルも別途保存（getColumnStateからソート情報を取得）
   const columnState = gridRef.value.api.getColumnState()
@@ -215,7 +202,6 @@ const onColumnStateChanged = () => {
   if (sortFromState.length > 0) {
     sortModel.value = sortFromState
     setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, sortFromState)
-    console.log('Sort model saved from column state:', sortFromState)
   } else {
     sortModel.value = []
     setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, null)
@@ -225,8 +211,6 @@ const onColumnStateChanged = () => {
 // ソート変更時の処理（専用のイベントハンドラー）
 const onSortChanged = () => {
   if (!gridRef.value?.api || isInitializing.value) return
-  
-  console.log('onSortChanged event fired')
   
   // getColumnStateからソート情報を取得
   const columnState = gridRef.value.api.getColumnState()
@@ -238,11 +222,9 @@ const onSortChanged = () => {
   if (sortFromState.length > 0) {
     sortModel.value = sortFromState
     setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, sortFromState)
-    console.log('Sort model saved (onSortChanged):', sortFromState)
   } else {
     sortModel.value = []
     setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, null)
-    console.log('Sort model cleared (onSortChanged)')
   }
 }
 
@@ -253,7 +235,6 @@ const onFilterChanged = () => {
   const model = gridRef.value.api.getFilterModel()
   filterModel.value = model
   setLocalStorage(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, Object.keys(model).length > 0 ? model : null)
-  console.log('Filter model saved:', model)
 }
 
 // ページネーション変更時の処理
@@ -274,7 +255,6 @@ const onPaginationChanged = () => {
   if (paginationPageSize.value !== pageSize) {
     paginationPageSize.value = pageSize
     setLocalStorage(STORAGE_KEYS.TODO_LIST_PAGE_SIZE, pageSize)
-    console.log('Page size saved:', pageSize)
   }
 }
 
@@ -332,21 +312,8 @@ const updateTodoListData = async () => {
   }
 }
 
-// チェックボックスの切り替え関数（無効化：完了状態は実行完了日で自動管理）
-// const handleToggleComplete = async (todoId: number, currentCompleted: boolean) => {
-//   try {
-//     await updateTodo(todoId, { completed: !currentCompleted })
-//     // データを再読み込み
-//     await updateTodoListData()
-//   } catch (e) {
-//     console.error('Error toggling todo:', e)
-//     alert('TODOの更新に失敗しました')
-//   }
-// }
-
 // グリッドコンテキスト（セルレンダラーからアクセス可能）
 const gridContext = {
-  // handleToggleComplete, // 無効化：完了状態は実行完了日で自動管理
   updateTodoListData,
   updateTodo,
 }
@@ -602,15 +569,6 @@ const restoreGridState = () => {
     return
   }
   
-  // APIオブジェクトの内容をデバッグ
-  if (retryCount === 0) {
-    console.log('AG Grid API object:', api)
-    console.log('Available methods:', Object.keys(api).filter(key => typeof api[key] === 'function').slice(0, 20))
-    console.log('paginationSetPageSize:', typeof api.paginationSetPageSize)
-    console.log('applyColumnState:', typeof api.applyColumnState)
-    console.log('setFilterModel:', typeof api.setFilterModel)
-  }
-  
   // APIメソッドの存在確認（AG Gridのバージョンによってメソッド名が異なる可能性があるため、代替方法も試す）
   const hasPaginationMethod = typeof api.paginationSetPageSize === 'function' || 
                               typeof api.setGridOption === 'function'
@@ -621,8 +579,6 @@ const restoreGridState = () => {
   
   if (!hasPaginationMethod || !hasColumnStateMethod || !hasFilterMethod) {
     retryCount++
-    console.log(`AG Grid API methods not ready yet, retrying... (${retryCount}/${MAX_RETRY_COUNT})`)
-    console.log(`Methods check: pagination=${hasPaginationMethod}, columnState=${hasColumnStateMethod}, filter=${hasFilterMethod}`)
     setTimeout(() => {
       if (!hasRestoredState && gridRef.value) {
         restoreGridState()
@@ -636,17 +592,10 @@ const restoreGridState = () => {
   retryCount = 0 // 成功したらリセット
   
   try {
-    console.log('Restoring grid state...')
-    console.log('Page size:', paginationPageSize.value)
-    console.log('Column state:', columnState.value)
-    console.log('Sort model:', sortModel.value)
-    console.log('Filter model:', filterModel.value)
-    
     // ページサイズを明示的に設定（paginationSetPageSizeは存在しないため、setGridOptionを使用）
     const pageSizeValue = paginationPageSize.value
     if (typeof api.setGridOption === 'function') {
       api.setGridOption('paginationPageSize', pageSizeValue)
-      console.log('Page size restored via setGridOption:', pageSizeValue)
     }
     
     // ソートモデルを復元（優先的にソート状態を復元）
@@ -664,7 +613,6 @@ const restoreGridState = () => {
           state: sortColumnState,
           applyOrder: false  // ソートのみを適用、カラムの順序は変更しない
         })
-        console.log('Sort model restored via applyColumnState:', sortModel.value)
       }
     } else if (columnState.value.length > 0) {
       // ソートモデルがない場合は、カラム状態からソートを復元
@@ -701,7 +649,6 @@ const restoreGridState = () => {
           state: stateWithoutSort,
           applyOrder: true
         })
-        console.log('Column state restored (without sort)')
       } else if (typeof api.setGridOption === 'function') {
         // 代替方法：各カラムの状態を個別に設定
         columnState.value.forEach((colState: any) => {
@@ -711,7 +658,6 @@ const restoreGridState = () => {
             if (colState.hide !== undefined) column.setVisible(!colState.hide)
           }
         })
-        console.log('Column state restored via alternative method')
       }
     }
     
@@ -719,34 +665,28 @@ const restoreGridState = () => {
     if (Object.keys(filterModel.value).length > 0) {
       if (typeof api.setFilterModel === 'function') {
         api.setFilterModel(filterModel.value)
-        console.log('Filter model restored')
       } else if (typeof api.setGridOption === 'function') {
         api.setGridOption('filterModel', filterModel.value)
-        console.log('Filter model restored via setGridOption')
       }
     }
     
     hasRestoredState = true
-    console.log('Grid state restored successfully')
   } catch (e) {
     console.error('Error restoring grid state:', e)
   } finally {
     // 初期化完了（少し遅延させてイベントが処理されるようにする）
     setTimeout(() => {
       isInitializing.value = false
-      console.log('Initialization complete')
     }, 200)
   }
 }
 
 // Grid Readyイベントハンドラー
 const onGridReady = () => {
-  console.log('Grid ready event fired')
   // グリッドが準備できたら状態を復元（少し待ってから）
   if (!hasRestoredState && todoListData.value.length > 0) {
     setTimeout(() => {
       if (!hasRestoredState) {
-        console.log('onGridReady: Restoring state')
         restoreGridState()
       }
     }, 300) // 300ms待機
@@ -755,14 +695,11 @@ const onGridReady = () => {
 
 // 最初のデータレンダリング後の処理
 const onFirstDataRendered = () => {
-  console.log('First data rendered event fired')
   // データがレンダリングされた後に状態を復元（まだ復元されていない場合）
   // AG GridのAPIが完全に初期化されるまで少し待つ
   if (!hasRestoredState) {
-    console.log('onFirstDataRendered: Waiting before restoring state...')
     setTimeout(() => {
       if (!hasRestoredState) {
-        console.log('onFirstDataRendered: Restoring state')
         restoreGridState()
       }
     }, 500) // 500ms待機

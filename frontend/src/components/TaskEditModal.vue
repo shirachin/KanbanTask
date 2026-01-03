@@ -464,18 +464,6 @@ const updateTodoDate = async (todoId: number, field: 'scheduled_date' | 'complet
   }
 }
 
-// TODOの完了状態を切り替え（無効化：完了状態は実行完了日で自動管理）
-// const toggleTodo = async (todoId: number, completed: boolean) => {
-//   if (!props.task) return
-//   
-//   try {
-//     await updateTodo(todoId, { completed })
-//     taskTodos.value = getTodos(props.task.id)
-//   } catch (e) {
-//     console.error('Error toggling todo:', e)
-//   }
-// }
-
 // TODOを削除
 const deleteTodoItem = async (todoId: number) => {
   if (!confirm('このTODOを削除しますか？')) {
