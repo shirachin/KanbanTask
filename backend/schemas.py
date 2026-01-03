@@ -5,7 +5,7 @@ from typing import Optional
 class TaskBase(BaseModel):
     title: str
     description: Optional[str] = None
-    status: str = "todo"  # ステータス名を文字列で保存
+    status: str = "not_started"  # ステータス名を文字列で保存（デフォルトは「未実行」）
     status_id: Optional[int] = None  # ステータスID
     order: int = 0  # 同じステータス内での順序
     completed: bool = False  # 後方互換性のため残す

@@ -69,6 +69,20 @@ $themes: (
       "shadowSm": oklch(0 0 0deg / 0.1),  // App.vue .header の box-shadow
       "shadowMd": oklch(0 0 0deg / 0.1),  // Dashboard.vue の box-shadow
       "shadowLg": oklch(0 0 0deg / 0.15),  // ThemeSelector.vue .theme-menu の box-shadow
+      
+      // エラー色
+      "errorColor": #dc3545,  // エラーテキスト、必須マーク、削除ボタンなど
+      "errorBackground": #f8d7da,  // エラーメッセージの背景色
+      "errorText": #721c24,  // エラーメッセージのテキスト色
+      "errorBorder": #f5c6cb,  // エラーメッセージのボーダー色
+      
+      // モーダルオーバーレイ
+      "modalOverlay": rgba(0, 0, 0, 0.5),  // モーダルの背景オーバーレイ
+      
+      // その他の背景色
+      "backgroundGrayLight": rgba(0, 0, 0, 0.05),  // 軽いグレー背景（App.vue .user-nameなど）
+      "backgroundGrayMedium": rgba(128, 128, 128, 0.2),  // 中程度のグレー背景
+      "backgroundGrayDark": rgba(128, 128, 128, 0.3),  // 濃いグレー背景
     ),
   ),
   "lightYellow": (
@@ -138,6 +152,20 @@ $themes: (
       "shadowSm": oklch(0 0 0deg / 0.1),
       "shadowMd": oklch(0 0 0deg / 0.1),
       "shadowLg": oklch(0 0 0deg / 0.15),
+      
+      // エラー色
+      "errorColor": #dc3545,
+      "errorBackground": #f8d7da,
+      "errorText": #721c24,
+      "errorBorder": #f5c6cb,
+      
+      // モーダルオーバーレイ
+      "modalOverlay": rgba(0, 0, 0, 0.5),
+      
+      // その他の背景色
+      "backgroundGrayLight": rgba(0, 0, 0, 0.05),
+      "backgroundGrayMedium": rgba(128, 128, 128, 0.2),
+      "backgroundGrayDark": rgba(128, 128, 128, 0.3),
     ),
   ),
   "secondary": (
@@ -207,6 +235,20 @@ $themes: (
       "shadowSm": oklch(0 0 0deg / 0.1),
       "shadowMd": oklch(0 0 0deg / 0.1),
       "shadowLg": oklch(0 0 0deg / 0.15),
+      
+      // エラー色
+      "errorColor": #dc3545,
+      "errorBackground": #f8d7da,
+      "errorText": #721c24,
+      "errorBorder": #f5c6cb,
+      
+      // モーダルオーバーレイ
+      "modalOverlay": rgba(0, 0, 0, 0.5),
+      
+      // その他の背景色
+      "backgroundGrayLight": rgba(0, 0, 0, 0.05),
+      "backgroundGrayMedium": rgba(128, 128, 128, 0.2),
+      "backgroundGrayDark": rgba(128, 128, 128, 0.3),
     ),
   ),
 );

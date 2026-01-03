@@ -44,11 +44,15 @@ export const useTasks = () => {
         url += `?${params.toString()}`
       }
       
+      console.log('Fetching tasks from:', url)
       const response = await fetch(url)
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Error response:', response.status, errorText)
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const data = await response.json()
+      console.log('Fetched tasks:', data.length, data)
       tasks.value = data
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'タスクの取得に失敗しました'

@@ -232,7 +232,7 @@ const removeAssignee = (index: number) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--current-modalOverlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -304,7 +304,7 @@ const removeAssignee = (index: number) => {
     font-weight: 500;
 
     .required-mark {
-      color: #dc3545;
+      color: var(--current-errorColor);
       margin-left: 0.25rem;
     }
   }
@@ -326,14 +326,14 @@ const removeAssignee = (index: number) => {
   }
 
   &.form-input-error {
-    border-color: #dc3545;
+    border-color: var(--current-errorColor);
   }
 }
 
 .error-message {
   display: block;
   margin-top: 0.25rem;
-  color: #dc3545;
+  color: var(--current-errorColor);
   font-size: 0.75rem;
 }
 
@@ -357,7 +357,7 @@ const removeAssignee = (index: number) => {
     border: 1px solid var(--current-borderColor);
     border-radius: 4px;
     background: var(--current-backgroundLight);
-    color: #dc3545;
+    color: var(--current-errorColor);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -366,7 +366,7 @@ const removeAssignee = (index: number) => {
     flex-shrink: 0;
 
     &:hover:not(:disabled) {
-      background: #f8d7da;
+      background: var(--current-errorBackground);
     }
 
     &:disabled {

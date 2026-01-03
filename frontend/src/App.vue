@@ -13,7 +13,10 @@
             {{ navOpen ? 'menu_open' : 'menu' }}
           </span>
         </button>
-        <h1>タスク管理アプリ</h1>
+        <div class="header-title">
+          <div class="header-icon" v-html="iconSvg"></div>
+          <h1>タスク管理アプリ</h1>
+        </div>
         <ThemeSelector />
       </div>
     </header>
@@ -118,20 +121,36 @@ import Changelog from './views/Changelog.vue'
 import Help from './views/Help.vue'
 import Login from './views/Login.vue'
 import ThemeSelector from './components/ThemeSelector.vue'
+import { getLocalStorage, setLocalStorage, STORAGE_KEYS } from './composables/useLocalStorage'
+
+// SVGアイコンをインラインで埋め込む（currentColorを正しく機能させるため）
+const iconSvg = `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 512 512" xml:space="preserve" style="width: 32px; height: 32px;">
+<style type="text/css">
+	.st0{fill:currentColor;}
+</style>
+<g>
+	<path class="st0" d="M444.51,253.4c-1.426-3.094-4.528-4.973-7.821-4.985c-0.012,0-0.023-0.008-0.031-0.008
+		c-0.012,0-0.023,0.008-0.031,0.008c-2.004,0.004-4.043,0.629-5.762,2.203l-50.857,46.56V406.2c0,4.782-3.875,8.661-8.657,8.661
+		H74.022c-4.782,0-8.661-3.879-8.661-8.661V264.377v-10.078v-86.244v-31.681V108.87c0-4.782,3.879-8.657,8.661-8.657h270.065
+		c2.164,0,4.25-0.813,5.843-2.27l52.431-47.962c5.828-5.332,2.054-15.047-5.844-15.047H8.66c-4.781,0-8.66,3.875-8.66,8.657v427.97
+		c0,4.786,3.879,8.661,8.66,8.661h428.053c4.782,0,8.657-3.875,8.657-8.661V257.006c0-1.328-0.352-2.489-0.84-3.562
+		C444.526,253.428,444.518,253.416,444.51,253.4z"></path>
+	<path class="st0" d="M494.64,33.34c-0.426-0.492-0.801-1.019-1.238-1.504l-0.003,0.004c-0.016-0.019-0.032-0.043-0.051-0.062
+		L238.545,264.963l-47.962-51.333c-25.294-27.079-66.74-29.993-95.498-7.813c-1.774,1.355-3.492,2.805-5.145,4.336v0.004
+		c-0.019,0.015-0.038,0.031-0.058,0.05l119.734,128.155c7.238,7.75,17.031,11.598,26.871,11.649c0.062,0,0.122,0.02,0.184,0.02
+		h0.004c0.274,0,0.535-0.07,0.805-0.074c1.976-0.043,3.941-0.191,5.894-0.551c0.27-0.046,0.527-0.144,0.797-0.199
+		c1.988-0.41,3.954-0.934,5.867-1.675c0.024-0.008,0.047-0.024,0.07-0.031c4.137-1.618,8.078-3.922,11.547-7.102L488.89,132.444
+		C517.414,106.338,519.77,62.4,494.64,33.34z"></path>
+</g>
+</svg>`
 
 type ViewType = 'dashboard' | 'kanban' | 'todo' | 'gantt' | 'project' | 'changelog' | 'help'
 
-const currentView = ref<ViewType>('dashboard')
+const currentView = ref<ViewType>(getLocalStorage<ViewType>(STORAGE_KEYS.APP_CURRENT_VIEW, 'dashboard'))
 const navOpen = ref(true)
 const showUserMenu = ref(false)
 
-// URLパラメータからユーザー名を取得
-const getUrlUser = (): string | null => {
-  const params = new URLSearchParams(window.location.search)
-  return params.get('user')
-}
-
-const currentUser = ref<string | null>(getUrlUser())
+const currentUser = ref<string | null>(getLocalStorage<string | null>(STORAGE_KEYS.APP_CURRENT_USER, null))
 const hasUser = computed(() => currentUser.value !== null)
 const currentTime = ref<string>('')
 
@@ -149,16 +168,10 @@ const updateTime = () => {
 
 let timeInterval: number | null = null
 
-// URLパラメータを維持しながらビューを切り替え
+// ビューを切り替え
 const switchView = (view: ViewType) => {
   currentView.value = view
-  // URLパラメータを維持
-  if (currentUser.value) {
-    const url = new URL(window.location.href)
-    url.searchParams.set('user', currentUser.value)
-    url.searchParams.set('view', view)
-    window.history.pushState({}, '', url.toString())
-  }
+  setLocalStorage(STORAGE_KEYS.APP_CURRENT_VIEW, view)
 }
 
 const toggleNav = () => {
@@ -184,29 +197,17 @@ const handleClickOutside = (event: MouseEvent) => {
   }
 }
 
-  // URLパラメータの変更を監視
   onMounted(() => {
-    // 初期ビューをURLパラメータから取得
-    const params = new URLSearchParams(window.location.search)
-    const viewParam = params.get('view') as ViewType | null
-    if (viewParam && ['dashboard', 'kanban', 'todo', 'gantt', 'project', 'changelog', 'help'].includes(viewParam)) {
-      currentView.value = viewParam
+    // LocalStorageから初期状態を復元
+    const savedView = getLocalStorage<ViewType>(STORAGE_KEYS.APP_CURRENT_VIEW, 'dashboard')
+    if (['dashboard', 'kanban', 'todo', 'gantt', 'project', 'changelog', 'help'].includes(savedView)) {
+      currentView.value = savedView
     }
-
-    // URLパラメータの変更を監視（ブラウザの戻る/進むボタン対応）
-    window.addEventListener('popstate', () => {
-      const user = getUrlUser()
-      if (user) {
-        currentUser.value = user
-        const params = new URLSearchParams(window.location.search)
-        const viewParam = params.get('view') as ViewType | null
-        if (viewParam && ['dashboard', 'kanban', 'todo', 'gantt', 'project', 'changelog', 'help'].includes(viewParam)) {
-          currentView.value = viewParam
-        }
-      } else {
-        currentUser.value = null
-      }
-    })
+    
+    const savedUser = getLocalStorage<string | null>(STORAGE_KEYS.APP_CURRENT_USER, null)
+    if (savedUser) {
+      currentUser.value = savedUser
+    }
 
     // クリックイベントリスナーを追加
     document.addEventListener('click', handleClickOutside)
@@ -224,16 +225,14 @@ const handleClickOutside = (event: MouseEvent) => {
     }
   })
 
-// ユーザー名が変更されたらURLを更新
+// ユーザー名が変更されたらLocalStorageを更新
 watch(currentUser, (newUser: string | null) => {
-  if (newUser) {
-    const url = new URL(window.location.href)
-    url.searchParams.set('user', newUser)
-    if (currentView.value) {
-      url.searchParams.set('view', currentView.value)
-    }
-    window.history.replaceState({}, '', url.toString())
-  }
+  setLocalStorage(STORAGE_KEYS.APP_CURRENT_USER, newUser)
+})
+
+// ビューが変更されたらLocalStorageを更新
+watch(currentView, (newView: ViewType) => {
+  setLocalStorage(STORAGE_KEYS.APP_CURRENT_VIEW, newView)
 })
 </script>
 
@@ -314,11 +313,38 @@ watch(currentUser, (newUser: string | null) => {
     }
   }
 
+  .header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+  }
+
+  .header-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    // SVGの色をテーマカラーに合わせる
+    color: var(--current-textWhite);
+    transition: color 0.3s ease;
+    
+    :deep(svg) {
+      width: 100%;
+      height: 100%;
+    }
+    
+    :deep(.st0) {
+      fill: currentColor;
+    }
+  }
+
   h1 {
     margin: 0;
     font-size: 1.8rem;
     font-weight: 600;
-    flex: 1;
   }
 }
 
@@ -402,7 +428,7 @@ watch(currentUser, (newUser: string | null) => {
     font-weight: 500;
     flex: 1;
     padding: 0.5rem 0.75rem;
-    background: rgba(0, 0, 0, 0.05);
+    background: var(--current-backgroundGrayLight);
     border-radius: 6px;
     text-align: center;
     word-break: break-word;
@@ -494,12 +520,12 @@ watch(currentUser, (newUser: string | null) => {
     user-select: none;
 
     &:hover {
-      background-color: rgba(128, 128, 128, 0.2);
+      background-color: var(--current-backgroundGrayMedium);
       color: var(--current-textPrimary);
     }
 
     &:active {
-      background-color: rgba(128, 128, 128, 0.3);
+      background-color: var(--current-backgroundGrayDark);
     }
   }
 

@@ -1,15 +1,20 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from typing import List
 import os
+import traceback
 
 from database import get_db, init_db
-from models import Task, Status, Project
+from models import Task, Status, Project, Todo
 from schemas import TaskCreate, TaskUpdate, TaskResponse
 from status_schemas import StatusCreate, StatusUpdate, StatusResponse
 from project_schemas import ProjectCreate, ProjectUpdate, ProjectResponse
+from todo_schemas import TodoCreate, TodoUpdate, TodoResponse
 
 app = FastAPI(title="Task Management API")
 
@@ -39,7 +44,66 @@ else:
         expose_headers=["*"],
     )
 
-    # データベース初期化
+# バリデーションエラーハンドラー（RequestValidationErrorは先に処理）
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """バリデーションエラーをキャッチして、CORSヘッダーを含む適切なHTTPレスポンスを返す"""
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors()},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+# グローバル例外ハンドラー（CORSヘッダーを含む適切なエラーレスポンスを返す）
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """すべての例外をキャッチして、適切なHTTPレスポンスとCORSヘッダーを返す"""
+    error_trace = traceback.format_exc()
+    print(f"Unhandled exception: {exc}")
+    print(f"Traceback: {error_trace}")
+    
+    # HTTPExceptionの場合はそのまま返す（CORSヘッダーを追加）
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    
+    # SQLAlchemyエラーの場合
+    from sqlalchemy.exc import SQLAlchemyError
+    if isinstance(exc, SQLAlchemyError):
+        print(f"Database error: {exc}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": "Database error occurred"},
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    
+    # その他の例外は500エラーとして返す
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": f"Internal server error: {str(exc)}"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+# データベース初期化
 @app.on_event("startup")
 def startup_event():
     init_db()
@@ -80,15 +144,37 @@ def startup_event():
     except Exception as e:
         print(f"個人タスクサポートマイグレーションエラー（無視可能）: {e}")
     
+    try:
+        from migrate_update_statuses import migrate as migrate_update_statuses
+        migrate_update_statuses()
+    except Exception as e:
+        print(f"ステータス更新マイグレーションエラー（無視可能）: {e}")
+    
+    try:
+        from migrate_add_todos import migrate as migrate_todos
+        migrate_todos()
+    except Exception as e:
+        print(f"todosテーブル作成マイグレーションエラー（無視可能）: {e}")
+    
+    try:
+        from migrate_add_todo_dates import migrate as migrate_todo_dates
+        migrate_todo_dates()
+    except Exception as e:
+        print(f"TODO日付カラム追加マイグレーションエラー（無視可能）: {e}")
+    
     # デフォルトステータスの初期化（各プロジェクトごと）
     from database import SessionLocal
     db = SessionLocal()
     try:
         projects = db.query(Project).all()
         default_statuses = [
-            {"name": "todo", "display_name": "To Do", "order": 0, "color": "#667eea"},
-            {"name": "doing", "display_name": "Doing", "order": 1, "color": "#ffa726"},
-            {"name": "done", "display_name": "Done", "order": 2, "color": "#51cf66"}
+            {"name": "considering", "display_name": "検討中", "order": 0, "color": "#9e9e9e"},
+            {"name": "not_started", "display_name": "未実行", "order": 1, "color": "#667eea"},
+            {"name": "in_progress", "display_name": "実行中", "order": 2, "color": "#ffa726"},
+            {"name": "review_pending", "display_name": "レビュー待ち", "order": 3, "color": "#9c27b0"},
+            {"name": "staging_deployed", "display_name": "検証環境反映済み", "order": 4, "color": "#ffeb3b"},
+            {"name": "production_deployed", "display_name": "本番環境反映済み", "order": 5, "color": "#51cf66"},
+            {"name": "cancelled", "display_name": "中止", "order": 6, "color": "#dc3545"}
         ]
         
         for project in projects:
@@ -115,13 +201,18 @@ def read_root():
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
 def get_tasks(project_id: int = None, project_ids: str = None, assignee: str = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    print(f"get_tasks called with project_id={project_id}, project_ids={project_ids}, assignee={assignee}")
     # status_idで並べ替え、同じstatus_id内ではorderで並べ替え
     from sqlalchemy import nullslast
     query = db.query(Task)
     if project_id is not None:
         query = query.filter(Task.project_id == project_id)
-        # project_id=-1の場合は個人タスクで、assigneeでフィルタリング
-        if project_id == -1 and assignee:
+        # assigneeが指定されている場合は、そのプロジェクトのタスクでassigneeが一致するもののみ
+        if assignee:
+            if project_id == -1:
+                print(f"Filtering for project_id=-1 and assignee={assignee}")
+            else:
+                print(f"Filtering for project_id={project_id} and assignee={assignee}")
             query = query.filter(Task.assignee == assignee)
     elif project_ids:
         # カンマ区切りのプロジェクトIDリスト
@@ -133,8 +224,10 @@ def get_tasks(project_id: int = None, project_ids: str = None, assignee: str = N
                 other_project_ids = [pid for pid in project_id_list if pid != -1]
                 if other_project_ids:
                     if assignee:
+                        # -1以外のプロジェクトIDでassigneeが一致するタスクと、-1かつassigneeが一致するタスク
+                        print(f"Filtering for project_ids={other_project_ids} with assignee={assignee} OR project_id=-1 with assignee={assignee}")
                         query = query.filter(
-                            (Task.project_id.in_(other_project_ids)) |
+                            ((Task.project_id.in_(other_project_ids)) & (Task.assignee == assignee)) |
                             ((Task.project_id == -1) & (Task.assignee == assignee))
                         )
                     else:
@@ -145,11 +238,19 @@ def get_tasks(project_id: int = None, project_ids: str = None, assignee: str = N
                 else:
                     # -1のみの場合
                     if assignee:
+                        print(f"Filtering for project_id=-1 with assignee={assignee}")
                         query = query.filter((Task.project_id == -1) & (Task.assignee == assignee))
                     else:
                         query = query.filter(Task.project_id == -1)
             else:
-                query = query.filter(Task.project_id.in_(project_id_list))
+                # -1以外のプロジェクトIDのみの場合
+                if assignee:
+                    # assigneeが指定されている場合は、そのプロジェクトのタスクでassigneeが一致するもののみ
+                    query = query.filter(
+                        (Task.project_id.in_(project_id_list)) & (Task.assignee == assignee)
+                    )
+                else:
+                    query = query.filter(Task.project_id.in_(project_id_list))
     elif assignee:
         # assigneeのみが指定された場合、project_id=-1のタスクを取得
         query = query.filter((Task.project_id == -1) & (Task.assignee == assignee))
@@ -157,6 +258,23 @@ def get_tasks(project_id: int = None, project_ids: str = None, assignee: str = N
         nullslast(Task.status_id),
         Task.order
     ).offset(skip).limit(limit).all()
+    print(f"Returning {len(tasks)} tasks")
+    # デバッグ用：最初の数件のタスク情報を出力
+    if len(tasks) > 0:
+        for i, task in enumerate(tasks[:3]):
+            print(f"Task {i}: id={task.id}, project_id={task.project_id}, assignee={task.assignee}, title={task.title}")
+    else:
+        # タスクが0件の場合、条件に合うタスクが存在するか確認
+        test_query = db.query(Task).filter(Task.project_id == -1)
+        all_personal_tasks = test_query.all()
+        print(f"Total personal tasks (project_id=-1): {len(all_personal_tasks)}")
+        if assignee:
+            test_query_with_assignee = db.query(Task).filter(Task.project_id == -1, Task.assignee == assignee)
+            matching_tasks = test_query_with_assignee.all()
+            print(f"Personal tasks with assignee={assignee}: {len(matching_tasks)}")
+            if len(matching_tasks) > 0:
+                for task in matching_tasks[:3]:
+                    print(f"  - Task id={task.id}, assignee={task.assignee}, title={task.title}")
     return tasks
 
 @app.get("/api/tasks/{task_id}", response_model=TaskResponse)
@@ -172,7 +290,27 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
     # ただし、project_id=-1の場合はassigneeが必須
     if task.project_id == -1 and not task.assignee:
         raise HTTPException(status_code=400, detail="Assignee is required for personal tasks (project_id=-1)")
-    db_task = Task(**task.dict())
+    
+    task_dict = task.dict()
+    
+    # status_idが指定されていない場合、status名から取得
+    if task_dict.get("status_id") is None and task_dict.get("status"):
+        status_name = task_dict["status"]
+        project_id = task_dict["project_id"]
+        
+        if project_id == -1:
+            # 個人タスクの場合はstatus_idはNoneのまま
+            task_dict["status_id"] = None
+        else:
+            # プロジェクトのステータスからIDを取得
+            status = db.query(Status).filter(
+                Status.name == status_name,
+                Status.project_id == project_id
+            ).first()
+            if status:
+                task_dict["status_id"] = status.id
+    
+    db_task = Task(**task_dict)
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
@@ -285,22 +423,37 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 # ステータス管理API
 @app.get("/api/statuses", response_model=List[StatusResponse])
 def get_statuses(project_id: int = None, db: Session = Depends(get_db)):
-    # project_id=-1の場合は個人タスク用のデフォルトステータスを返す
-    if project_id == -1:
-        # 個人タスク用のデフォルトステータス（仮想的なIDを使用）
-        default_statuses = [
-            {"id": -1, "name": "todo", "display_name": "未着手", "order": 0, "color": "#667eea", "project_id": -1},
-            {"id": -2, "name": "doing", "display_name": "進行中", "order": 1, "color": "#ffa726", "project_id": -1},
-            {"id": -3, "name": "review", "display_name": "レビュー中", "order": 2, "color": "#9c27b0", "project_id": -1},
-            {"id": -4, "name": "done", "display_name": "完了", "order": 3, "color": "#51cf66", "project_id": -1}
-        ]
-        return [StatusResponse(**status) for status in default_statuses]
-    
-    query = db.query(Status)
-    if project_id is not None:
-        query = query.filter(Status.project_id == project_id)
-    statuses = query.order_by(Status.order).all()
-    return statuses
+    try:
+        print(f"get_statuses called with project_id={project_id}")
+        # project_id=-1の場合は個人タスク用のデフォルトステータスを返す
+        if project_id == -1:
+            # 個人タスク用のデフォルトステータス（仮想的なIDを使用）
+            from datetime import datetime
+            default_statuses = [
+                {"id": -1, "name": "considering", "display_name": "検討中", "order": 0, "color": "#9e9e9e", "project_id": -1, "created_at": datetime.now()},
+                {"id": -2, "name": "not_started", "display_name": "未実行", "order": 1, "color": "#667eea", "project_id": -1, "created_at": datetime.now()},
+                {"id": -3, "name": "in_progress", "display_name": "実行中", "order": 2, "color": "#ffa726", "project_id": -1, "created_at": datetime.now()},
+                {"id": -4, "name": "review_pending", "display_name": "レビュー待ち", "order": 3, "color": "#9c27b0", "project_id": -1, "created_at": datetime.now()},
+                {"id": -5, "name": "staging_deployed", "display_name": "検証環境反映済み", "order": 4, "color": "#ffeb3b", "project_id": -1, "created_at": datetime.now()},
+                {"id": -6, "name": "production_deployed", "display_name": "本番環境反映済み", "order": 5, "color": "#51cf66", "project_id": -1, "created_at": datetime.now()},
+                {"id": -7, "name": "cancelled", "display_name": "中止", "order": 6, "color": "#dc3545", "project_id": -1, "created_at": datetime.now()}
+            ]
+            result = [StatusResponse(**status) for status in default_statuses]
+            print(f"Returning {len(result)} default statuses for project_id=-1")
+            return result
+        
+        query = db.query(Status)
+        if project_id is not None:
+            query = query.filter(Status.project_id == project_id)
+        statuses = query.order_by(Status.order).all()
+        print(f"Returning {len(statuses)} statuses from database for project_id={project_id}")
+        return statuses
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error in get_statuses: {e}")
+        print(f"Traceback: {error_trace}")
+        raise HTTPException(status_code=500, detail=f"Error fetching statuses: {str(e)}")
 
 @app.post("/api/statuses", response_model=StatusResponse)
 def create_status(status: StatusCreate, db: Session = Depends(get_db)):
@@ -424,9 +577,13 @@ def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
     
     # デフォルトステータスを作成
     default_statuses = [
-        {"name": "todo", "display_name": "To Do", "order": 0, "color": "#667eea", "project_id": db_project.id},
-        {"name": "doing", "display_name": "Doing", "order": 1, "color": "#ffa726", "project_id": db_project.id},
-        {"name": "done", "display_name": "Done", "order": 2, "color": "#51cf66", "project_id": db_project.id}
+        {"name": "considering", "display_name": "検討中", "order": 0, "color": "#9e9e9e", "project_id": db_project.id},
+        {"name": "not_started", "display_name": "未実行", "order": 1, "color": "#667eea", "project_id": db_project.id},
+        {"name": "in_progress", "display_name": "実行中", "order": 2, "color": "#ffa726", "project_id": db_project.id},
+        {"name": "review_pending", "display_name": "レビュー待ち", "order": 3, "color": "#9c27b0", "project_id": db_project.id},
+        {"name": "staging_deployed", "display_name": "検証環境反映済み", "order": 4, "color": "#ffeb3b", "project_id": db_project.id},
+        {"name": "production_deployed", "display_name": "本番環境反映済み", "order": 5, "color": "#51cf66", "project_id": db_project.id},
+        {"name": "cancelled", "display_name": "中止", "order": 6, "color": "#dc3545", "project_id": db_project.id}
     ]
     
     for status_data in default_statuses:
@@ -491,3 +648,131 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
     db.delete(db_project)
     db.commit()
     return {"message": "Project deleted successfully"}
+
+# TODO管理API
+@app.get("/api/tasks/{task_id}/todos", response_model=List[TodoResponse])
+def get_todos(task_id: int, db: Session = Depends(get_db)):
+    # タスクの存在確認
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    todos = db.query(Todo).filter(Todo.task_id == task_id).order_by(Todo.order).all()
+    return todos
+
+# すべてのTODOを取得（ページネーション対応、タスク情報とプロジェクト情報を含む）
+@app.get("/api/todos")
+def get_all_todos(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    from sqlalchemy.orm import joinedload
+    
+    # TODOを取得（タスクとプロジェクト情報をJOIN、LEFT JOINで個人タスクも含める）
+    query = db.query(Todo).join(Task, Todo.task_id == Task.id).outerjoin(
+        Project, Task.project_id == Project.id
+    )
+    
+    # 総件数を取得
+    total = query.count()
+    
+    # ページネーション適用
+    todos = query.order_by(Todo.order).offset(skip).limit(limit).all()
+    
+    # レスポンス用のデータを構築
+    result = []
+    for todo in todos:
+        task = todo.task
+        project = task.project if task and task.project_id != -1 else None
+        result.append({
+            "id": todo.id,
+            "task_id": todo.task_id,
+            "title": todo.title,
+            "completed": todo.completed,
+            "order": todo.order,
+            "scheduled_date": todo.scheduled_date.isoformat() if todo.scheduled_date else None,
+            "completed_date": todo.completed_date.isoformat() if todo.completed_date else None,
+            "created_at": todo.created_at.isoformat() if todo.created_at else None,
+            "updated_at": todo.updated_at.isoformat() if todo.updated_at else None,
+            "task_name": task.title if task else None,
+            "project_id": task.project_id if task else None,
+            "project_name": "個人タスク" if task and task.project_id == -1 else (project.name if project else None),
+        })
+    
+    return {
+        "items": result,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
+
+@app.post("/api/tasks/{task_id}/todos", response_model=TodoResponse)
+def create_todo(task_id: int, todo: TodoCreate, db: Session = Depends(get_db)):
+    # タスクの存在確認
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # task_idを設定
+    todo_dict = todo.dict()
+    todo_dict["task_id"] = task_id
+    
+    # date型をdatetime型に変換（SQLAlchemyのDateTimeカラム用）
+    from datetime import datetime, date
+    if todo_dict.get("scheduled_date") and isinstance(todo_dict["scheduled_date"], date):
+        todo_dict["scheduled_date"] = datetime.combine(todo_dict["scheduled_date"], datetime.min.time())
+    if todo_dict.get("completed_date") and isinstance(todo_dict["completed_date"], date):
+        todo_dict["completed_date"] = datetime.combine(todo_dict["completed_date"], datetime.min.time())
+    
+    db_todo = Todo(**todo_dict)
+    db.add(db_todo)
+    db.commit()
+    db.refresh(db_todo)
+    return db_todo
+
+@app.put("/api/todos/{todo_id}", response_model=TodoResponse)
+def update_todo(todo_id: int, todo_update: TodoUpdate, db: Session = Depends(get_db)):
+    db_todo = db.query(Todo).filter(Todo.id == todo_id).first()
+    if db_todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    
+    update_data = todo_update.dict(exclude_unset=True)
+    
+    # date型をdatetime型に変換（SQLAlchemyのDateTimeカラム用）
+    from datetime import datetime, date
+    if "scheduled_date" in update_data and update_data["scheduled_date"] is not None:
+        if isinstance(update_data["scheduled_date"], date):
+            update_data["scheduled_date"] = datetime.combine(update_data["scheduled_date"], datetime.min.time())
+    if "completed_date" in update_data and update_data["completed_date"] is not None:
+        if isinstance(update_data["completed_date"], date):
+            update_data["completed_date"] = datetime.combine(update_data["completed_date"], datetime.min.time())
+    
+    # 実行完了日が設定された場合は自動的にcompletedをtrueに、削除された場合はfalseに
+    if "completed_date" in update_data:
+        if update_data["completed_date"] is not None:
+            # 実行完了日が設定された場合はcompletedをtrueに
+            update_data["completed"] = True
+        else:
+            # 実行完了日が削除された場合はcompletedをfalseに
+            update_data["completed"] = False
+    
+    # completedが直接指定されている場合は、completed_dateに基づいて上書きしない
+    # （フロントエンドからcompleted_dateとcompletedの両方が送られてきた場合のため）
+    
+    for field, value in update_data.items():
+        setattr(db_todo, field, value)
+    
+    db.commit()
+    db.refresh(db_todo)
+    return db_todo
+
+@app.delete("/api/todos/{todo_id}")
+def delete_todo(todo_id: int, db: Session = Depends(get_db)):
+    db_todo = db.query(Todo).filter(Todo.id == todo_id).first()
+    if db_todo is None:
+        raise HTTPException(status_code=404, detail="Todo not found")
+    
+    db.delete(db_todo)
+    db.commit()
+    return {"message": "Todo deleted successfully"}

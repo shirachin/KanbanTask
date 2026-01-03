@@ -38,7 +38,7 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
-    status = Column(String, nullable=False, default="todo")
+    status = Column(String, nullable=False, default="not_started")
     status_id = Column(Integer, ForeignKey("statuses.id"), nullable=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     assignee = Column(String, nullable=True)  # 担当者（個人タスク用）
@@ -49,3 +49,19 @@ class Task(Base):
     
     project = relationship("Project", back_populates="tasks")
     status_obj = relationship("Status", back_populates="tasks")
+    todos = relationship("Todo", back_populates="task", cascade="all, delete-orphan", order_by="Todo.order")
+
+class Todo(Base):
+    __tablename__ = "todos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    title = Column(String, nullable=False)
+    completed = Column(Boolean, default=False)
+    order = Column(Integer, default=0)
+    scheduled_date = Column(DateTime(timezone=True), nullable=True)  # 実行予定日
+    completed_date = Column(DateTime(timezone=True), nullable=True)  # 実行完了日
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    task = relationship("Task", back_populates="todos")

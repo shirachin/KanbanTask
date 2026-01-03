@@ -26,6 +26,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { setLocalStorage, STORAGE_KEYS } from '../composables/useLocalStorage'
 
 const username = ref('')
 
@@ -45,9 +46,10 @@ const handleLogin = () => {
   const trimmedUsername = username.value.trim()
   // 半角英数字のみで、かつ空でないことを確認
   if (trimmedUsername && /^[a-zA-Z0-9]+$/.test(trimmedUsername)) {
-    const url = new URL(window.location.href)
-    url.searchParams.set('user', trimmedUsername)
-    window.location.href = url.toString()
+    // LocalStorageに保存
+    setLocalStorage(STORAGE_KEYS.APP_CURRENT_USER, trimmedUsername)
+    // ページをリロードしてApp.vueで状態を読み込む
+    window.location.reload()
   }
 }
 </script>

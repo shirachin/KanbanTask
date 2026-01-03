@@ -92,7 +92,9 @@ const applyTheme = () => {
     'paletteBaseColorBackground', 'paletteBaseColorText', 'paletteSwatchShadow',
     'paletteSwatchHoverShadow', 'paletteSwatchBorder', 'paletteSwatchBorderShadow',
     'tooltipBackground', 'tooltipBorder', 'tooltipShadow', 'tooltipText',
-    'shadowSm', 'shadowMd', 'shadowLg'
+    'shadowSm', 'shadowMd', 'shadowLg', 'errorColor', 'errorBackground',
+    'errorText', 'errorBorder', 'modalOverlay', 'backgroundGrayLight',
+    'backgroundGrayMedium', 'backgroundGrayDark'
   ]
   
   schemaKeys.forEach(key => {
