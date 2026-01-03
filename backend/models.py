@@ -41,6 +41,7 @@ class Task(Base):
     status = Column(String, nullable=False, default="todo")
     status_id = Column(Integer, ForeignKey("statuses.id"), nullable=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    assignee = Column(String, nullable=True)  # 担当者（個人タスク用）
     order = Column(Integer, default=0)
     completed = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

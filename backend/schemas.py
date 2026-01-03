@@ -6,9 +6,11 @@ class TaskBase(BaseModel):
     title: str
     description: Optional[str] = None
     status: str = "todo"  # ステータス名を文字列で保存
+    status_id: Optional[int] = None  # ステータスID
     order: int = 0  # 同じステータス内での順序
     completed: bool = False  # 後方互換性のため残す
-    project_id: int  # プロジェクトID
+    project_id: int  # プロジェクトID（-1の場合は個人タスク）
+    assignee: Optional[str] = None  # 担当者（個人タスク用、project_id=-1の場合に使用）
 
 class TaskCreate(TaskBase):
     pass
@@ -20,6 +22,7 @@ class TaskUpdate(BaseModel):
     order: Optional[int] = None
     completed: Optional[bool] = None
     project_id: Optional[int] = None
+    assignee: Optional[str] = None
 
 class TaskResponse(TaskBase):
     id: int

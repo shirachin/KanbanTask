@@ -58,15 +58,17 @@ const editingProject = ref<Project | null>(null)
 // AG Grid用のrowData（projectsを変換）
 const rowData = ref<Project[]>([])
 
-// projectsが変更されたらrowDataを更新
+// projectsが変更されたらrowDataを更新（システム用プロジェクト（id=-1）は除外）
 const updateRowData = () => {
-  rowData.value = projects.value.map((p: Project) => ({
-    id: p.id,
-    name: p.name,
-    startMonth: p.startMonth || '',
-    endMonth: p.endMonth || '',
-    assignee: p.assignee || [],
-  }))
+  rowData.value = projects.value
+    .filter((p: Project) => p.id !== -1)  // システム用プロジェクト（id=-1）を除外
+    .map((p: Project) => ({
+      id: p.id,
+      name: p.name,
+      startMonth: p.startMonth || '',
+      endMonth: p.endMonth || '',
+      assignee: p.assignee || [],
+    }))
 }
 
 // プロジェクトを監視してrowDataを更新

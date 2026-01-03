@@ -19,11 +19,15 @@ export const useProjects = () => {
   const error = ref<string | null>(null)
 
   // プロジェクト一覧を取得
-  const fetchProjects = async () => {
+  const fetchProjects = async (assignee?: string) => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/projects`)
+      let url = `${API_URL}/api/projects`
+      if (assignee) {
+        url += `?assignee=${encodeURIComponent(assignee)}`
+      }
+      const response = await fetch(url)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }

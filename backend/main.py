@@ -39,7 +39,7 @@ else:
         expose_headers=["*"],
     )
 
-# データベース初期化
+    # データベース初期化
 @app.on_event("startup")
 def startup_event():
     init_db()
@@ -67,6 +67,18 @@ def startup_event():
         migrate_project_fields()
     except Exception as e:
         print(f"プロジェクトフィールドマイグレーションエラー（無視可能）: {e}")
+    
+    try:
+        from migrate_add_task_assignee import migrate as migrate_task_assignee
+        migrate_task_assignee()
+    except Exception as e:
+        print(f"タスク担当者マイグレーションエラー（無視可能）: {e}")
+    
+    try:
+        from migrate_add_personal_task_support import migrate as migrate_personal_task
+        migrate_personal_task()
+    except Exception as e:
+        print(f"個人タスクサポートマイグレーションエラー（無視可能）: {e}")
     
     # デフォルトステータスの初期化（各プロジェクトごと）
     from database import SessionLocal
@@ -102,12 +114,45 @@ def read_root():
     return {"message": "Task Management API"}
 
 @app.get("/api/tasks", response_model=List[TaskResponse])
-def get_tasks(project_id: int = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_tasks(project_id: int = None, project_ids: str = None, assignee: str = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     # status_idで並べ替え、同じstatus_id内ではorderで並べ替え
     from sqlalchemy import nullslast
     query = db.query(Task)
     if project_id is not None:
         query = query.filter(Task.project_id == project_id)
+        # project_id=-1の場合は個人タスクで、assigneeでフィルタリング
+        if project_id == -1 and assignee:
+            query = query.filter(Task.assignee == assignee)
+    elif project_ids:
+        # カンマ区切りのプロジェクトIDリスト
+        project_id_list = [int(pid.strip()) for pid in project_ids.split(',') if pid.strip()]
+        if project_id_list:
+            # -1が含まれている場合は個人タスクを含む
+            if -1 in project_id_list:
+                # -1以外のプロジェクトIDと、-1かつassigneeが一致するタスク
+                other_project_ids = [pid for pid in project_id_list if pid != -1]
+                if other_project_ids:
+                    if assignee:
+                        query = query.filter(
+                            (Task.project_id.in_(other_project_ids)) |
+                            ((Task.project_id == -1) & (Task.assignee == assignee))
+                        )
+                    else:
+                        query = query.filter(
+                            (Task.project_id.in_(other_project_ids)) |
+                            (Task.project_id == -1)
+                        )
+                else:
+                    # -1のみの場合
+                    if assignee:
+                        query = query.filter((Task.project_id == -1) & (Task.assignee == assignee))
+                    else:
+                        query = query.filter(Task.project_id == -1)
+            else:
+                query = query.filter(Task.project_id.in_(project_id_list))
+    elif assignee:
+        # assigneeのみが指定された場合、project_id=-1のタスクを取得
+        query = query.filter((Task.project_id == -1) & (Task.assignee == assignee))
     tasks = query.order_by(
         nullslast(Task.status_id),
         Task.order
@@ -123,6 +168,10 @@ def get_task(task_id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/tasks", response_model=TaskResponse)
 def create_task(task: TaskCreate, db: Session = Depends(get_db)):
+    # project_id=-1の場合は個人タスク（外部キー制約を回避するため、特別な処理は不要）
+    # ただし、project_id=-1の場合はassigneeが必須
+    if task.project_id == -1 and not task.assignee:
+        raise HTTPException(status_code=400, detail="Assignee is required for personal tasks (project_id=-1)")
     db_task = Task(**task.dict())
     db.add(db_task)
     db.commit()
@@ -137,41 +186,38 @@ def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get
     
     update_data = task_update.dict(exclude_unset=True)
     
+    # プロジェクトIDを取得（更新データまたは既存のタスクから）
+    project_id = update_data.get("project_id", db_task.project_id)
+    
     # ステータスが変更された場合、status_idも更新
     if "status" in update_data:
         status_name = update_data["status"]
-        project_id = update_data.get("project_id", db_task.project_id)
-        status = db.query(Status).filter(
-            Status.name == status_name,
-            Status.project_id == project_id
-        ).first()
-        if status:
-            update_data["status_id"] = status.id
+        # project_id=-1の場合は個人タスクで、status_idはNULLにする
+        if project_id == -1:
+            update_data["status_id"] = None
+        else:
+            status = db.query(Status).filter(
+                Status.name == status_name,
+                Status.project_id == project_id
+            ).first()
+            if status:
+                update_data["status_id"] = status.id
     
     # 順序が変更された場合、同じステータス内の他のタスクの順序を調整
     if "order" in update_data:
         new_order = update_data["order"]
         old_order = db_task.order or 0
         status_id = update_data.get("status_id", db_task.status_id)
+        status_name = update_data.get("status", db_task.status)
         
-        # status_idがNoneの場合は、status名から取得
-        if status_id is None and "status" in update_data:
-            status_name = update_data["status"]
-            project_id = update_data.get("project_id", db_task.project_id)
-            status = db.query(Status).filter(
-                Status.name == status_name,
-                Status.project_id == project_id
-            ).first()
-            if status:
-                status_id = status.id
-                update_data["status_id"] = status_id
-        
-        if status_id is not None:
-            # 同じステータス内のタスクを取得（同じプロジェクト内）
-            project_id = update_data.get("project_id", db_task.project_id)
+        # project_id=-1の場合は、status名とassigneeでフィルタリング
+        if project_id == -1:
+            # 同じステータス内のタスクを取得（同じプロジェクトIDとassignee）
+            assignee = update_data.get("assignee", db_task.assignee)
             same_status_tasks = db.query(Task).filter(
-                Task.status_id == status_id,
-                Task.project_id == project_id,
+                Task.status == status_name,
+                Task.project_id == -1,
+                Task.assignee == assignee,
                 Task.id != task_id
             ).all()
             
@@ -187,6 +233,37 @@ def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get
                     task_order = task.order or 0
                     if task_order > old_order and task_order <= new_order:
                         task.order = task_order - 1
+        else:
+            # status_idがNoneの場合は、status名から取得
+            if status_id is None and "status" in update_data:
+                status = db.query(Status).filter(
+                    Status.name == status_name,
+                    Status.project_id == project_id
+                ).first()
+                if status:
+                    status_id = status.id
+                    update_data["status_id"] = status_id
+            
+            if status_id is not None:
+                # 同じステータス内のタスクを取得（同じプロジェクト内）
+                same_status_tasks = db.query(Task).filter(
+                    Task.status_id == status_id,
+                    Task.project_id == project_id,
+                    Task.id != task_id
+                ).all()
+                
+                if new_order < old_order:
+                    # 上に移動: 新しい位置から古い位置までのタスクを1つ下に
+                    for task in same_status_tasks:
+                        task_order = task.order or 0
+                        if task_order >= new_order and task_order < old_order:
+                            task.order = task_order + 1
+                elif new_order > old_order:
+                    # 下に移動: 古い位置から新しい位置までのタスクを1つ上に
+                    for task in same_status_tasks:
+                        task_order = task.order or 0
+                        if task_order > old_order and task_order <= new_order:
+                            task.order = task_order - 1
     
     for field, value in update_data.items():
         setattr(db_task, field, value)
@@ -208,6 +285,17 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 # ステータス管理API
 @app.get("/api/statuses", response_model=List[StatusResponse])
 def get_statuses(project_id: int = None, db: Session = Depends(get_db)):
+    # project_id=-1の場合は個人タスク用のデフォルトステータスを返す
+    if project_id == -1:
+        # 個人タスク用のデフォルトステータス（仮想的なIDを使用）
+        default_statuses = [
+            {"id": -1, "name": "todo", "display_name": "未着手", "order": 0, "color": "#667eea", "project_id": -1},
+            {"id": -2, "name": "doing", "display_name": "進行中", "order": 1, "color": "#ffa726", "project_id": -1},
+            {"id": -3, "name": "review", "display_name": "レビュー中", "order": 2, "color": "#9c27b0", "project_id": -1},
+            {"id": -4, "name": "done", "display_name": "完了", "order": 3, "color": "#51cf66", "project_id": -1}
+        ]
+        return [StatusResponse(**status) for status in default_statuses]
+    
     query = db.query(Status)
     if project_id is not None:
         query = query.filter(Status.project_id == project_id)
@@ -267,9 +355,17 @@ def delete_status(status_id: int, db: Session = Depends(get_db)):
 
 # プロジェクト管理API
 @app.get("/api/projects", response_model=List[ProjectResponse])
-def get_projects(db: Session = Depends(get_db)):
+def get_projects(assignee: str = None, db: Session = Depends(get_db)):
     import json
-    projects = db.query(Project).order_by(Project.created_at.desc()).all()
+    query = db.query(Project)
+    
+    # 担当者でフィルタリング
+    if assignee:
+        # assigneeカラムに担当者が含まれるプロジェクトを検索
+        # JSON配列として保存されているため、LIKE検索を使用
+        query = query.filter(Project.assignee.like(f'%"{assignee}"%'))
+    
+    projects = query.order_by(Project.created_at.desc()).all()
     # assigneeをリストに変換
     for project in projects:
         if project.assignee:
@@ -280,6 +376,20 @@ def get_projects(db: Session = Depends(get_db)):
         else:
             project.assignee = []
     return projects
+
+@app.get("/api/projects/personal/{username}", response_model=ProjectResponse)
+def get_or_create_personal_project(username: str, db: Session = Depends(get_db)):
+    """
+    個人的タスク用のプロジェクトを取得または作成（非推奨）
+    
+    注意: このエンドポイントは非推奨です。
+    個人タスクはプロジェクトID=-1で扱うように変更されました。
+    このエンドポイントは後方互換性のため残されていますが、使用しないでください。
+    """
+    raise HTTPException(
+        status_code=410, 
+        detail="This endpoint is deprecated. Personal tasks should use project_id=-1 instead."
+    )
 
 @app.get("/api/projects/{project_id}", response_model=ProjectResponse)
 def get_project(project_id: int, db: Session = Depends(get_db)):
@@ -337,6 +447,10 @@ def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
 @app.put("/api/projects/{project_id}", response_model=ProjectResponse)
 def update_project(project_id: int, project_update: ProjectUpdate, db: Session = Depends(get_db)):
     import json
+    # システム用プロジェクト（id=-1）は更新不可
+    if project_id == -1:
+        raise HTTPException(status_code=403, detail="Cannot update system project (id=-1)")
+    
     db_project = db.query(Project).filter(Project.id == project_id).first()
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -365,6 +479,10 @@ def update_project(project_id: int, project_update: ProjectUpdate, db: Session =
 
 @app.delete("/api/projects/{project_id}")
 def delete_project(project_id: int, db: Session = Depends(get_db)):
+    # システム用プロジェクト（id=-1）は削除不可
+    if project_id == -1:
+        raise HTTPException(status_code=403, detail="Cannot delete system project (id=-1)")
+    
     db_project = db.query(Project).filter(Project.id == project_id).first()
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
