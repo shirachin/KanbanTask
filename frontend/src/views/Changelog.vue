@@ -56,6 +56,19 @@ interface VersionData {
 
 const versions: VersionData[] = [
   {
+    id: '0.1.3',
+    version: 'β0.1.3',
+    date: '2026年1月5日',
+    categories: [
+      {
+        title: 'フロントエンド機能',
+        items: [
+          '<strong>チェンジログ</strong>:<ul class="nested-list"><li>バージョン切り替え機能の修正（v-forとv-ifの競合問題を解決）</li></ul>'
+        ]
+      }
+    ]
+  },
+  {
     id: '0.1.2',
     version: 'β0.1.2',
     date: '2026年1月4日',
