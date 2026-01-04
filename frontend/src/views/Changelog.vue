@@ -54,6 +54,25 @@ interface VersionData {
 
 const versions: VersionData[] = [
   {
+    id: '0.1.2',
+    version: 'β0.1.2',
+    date: '2026年1月4日',
+    categories: [
+      {
+        title: 'フロントエンド機能',
+        items: [
+          '<strong>カンバンボード</strong>:<ul class="nested-list"><li>タスク編集モーダルに削除機能を追加（削除ボタン、確認ダイアログ付き）</li></ul>'
+        ]
+      },
+      {
+        title: 'バックエンド機能',
+        items: [
+          '<strong>ステータス管理</strong>:<ul class="nested-list"><li>ステータスをすべてのプロジェクト・個人タスクで共通化（7種類の共通ステータスのみ使用）</li><li>プロジェクト作成時にステータスを自動作成しない仕様に変更</li><li>ステータス取得APIを共通ステータスを返すように修正</li></ul>'
+        ]
+      }
+    ]
+  },
+  {
     id: '0.1.1',
     version: 'β0.1.1',
     date: '2026年1月4日',
