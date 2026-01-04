@@ -14,19 +14,59 @@
             対象プロジェクト
             <span class="required-mark">*</span>
           </label>
-          <select
-            id="task-project"
-            v-model="formData.project_id"
-            class="form-input"
-            :class="{ 'form-input-error': errors.project_id }"
-            @change="handleProjectChange"
-            required
-          >
-            <option value="">プロジェクトを選択</option>
-            <option v-for="project in availableProjects" :key="project.id" :value="project.id">
-              {{ project.name }}
-            </option>
-          </select>
+          <div class="project-autocomplete-container">
+            <div class="project-autocomplete-input-wrapper">
+              <input
+                id="task-project"
+                v-model="projectSearchQuery"
+                type="text"
+                class="form-input project-autocomplete-input"
+                :class="{ 'form-input-error': errors.project_id }"
+                @focus="handleProjectSearchFocus"
+                @blur="handleProjectSearchBlur"
+                @input="handleProjectSearchInput"
+                @keydown.enter.prevent="handleProjectSearchEnter"
+                @keydown.arrow-down.prevent="navigateProjectDropdown(1)"
+                @keydown.arrow-up.prevent="navigateProjectDropdown(-1)"
+                @keydown.escape="showProjectDropdown = false"
+                placeholder="プロジェクトを検索..."
+                autocomplete="off"
+                required
+              />
+              <span 
+                v-if="selectedProjectId" 
+                class="project-autocomplete-clear" 
+                @click.stop="clearProjectSelection"
+                title="クリア"
+              >
+                <span class="material-symbols-outlined">close</span>
+              </span>
+              <span 
+                v-else
+                class="project-autocomplete-arrow" 
+                @click.stop="showProjectDropdown = !showProjectDropdown"
+              >
+                <span class="material-symbols-outlined">{{ showProjectDropdown ? 'expand_less' : 'expand_more' }}</span>
+              </span>
+            </div>
+            <div v-if="showProjectDropdown && (projectSearchQuery || filteredProjects.length > 0)" class="project-autocomplete-dropdown">
+              <div
+                v-if="filteredProjects.length === 0 && projectSearchQuery.trim()"
+                class="project-autocomplete-no-results"
+              >
+                プロジェクトが見つかりません
+              </div>
+              <div
+                v-for="(project, index) in filteredProjects"
+                :key="project.id"
+                :class="['project-autocomplete-option', { 'project-autocomplete-option-selected': index === selectedProjectIndex, 'project-autocomplete-option-active': selectedProjectId === project.id }]"
+                @mousedown.prevent="selectProject(project.id, project.name)"
+                @mouseenter="selectedProjectIndex = index"
+              >
+                {{ project.name }}
+              </div>
+            </div>
+          </div>
           <span v-if="errors.project_id" class="error-message">{{ errors.project_id }}</span>
         </div>
         
@@ -155,6 +195,13 @@ const errors = reactive({
 const loadingStatuses = ref(false)
 const availableStatuses = ref<Status[]>([])
 
+// プロジェクト検索用の状態
+const projectSearchQuery = ref<string>('')
+const showProjectDropdown = ref<boolean>(false)
+const selectedProjectIndex = ref<number>(-1)
+const selectedProjectId = ref<number | null>(null)
+const selectedProjectName = ref<string>('')
+
 // 利用可能なプロジェクト（個人タスクを含む）
 const availableProjects = computed(() => {
   const projects = [...props.projects]
@@ -172,6 +219,17 @@ const availableProjects = computed(() => {
   return projects
 })
 
+// プロジェクト検索用のフィルタリング
+const filteredProjects = computed(() => {
+  if (!projectSearchQuery.value.trim()) {
+    return availableProjects.value
+  }
+  const query = projectSearchQuery.value.toLowerCase().trim()
+  return availableProjects.value.filter((p: Project) =>
+    p.name.toLowerCase().includes(query)
+  )
+})
+
 // 利用可能な担当者（選択されたプロジェクトの担当者 + 現在のユーザー）
 const availableAssignees = computed(() => {
   const assignees = new Set<string>()
@@ -180,8 +238,8 @@ const availableAssignees = computed(() => {
     assignees.add(props.currentUser)
   }
   
-  if (formData.value.project_id) {
-    const projectId = parseInt(formData.value.project_id.toString())
+  const projectId = selectedProjectId.value !== null ? selectedProjectId.value : (formData.value.project_id ? parseInt(formData.value.project_id.toString()) : null)
+  if (projectId !== null) {
     if (projectId === -1) {
       // 個人タスクの場合は現在のユーザーのみ
       if (props.currentUser) {
@@ -197,6 +255,91 @@ const availableAssignees = computed(() => {
   
   return Array.from(assignees).sort()
 })
+
+// プロジェクト選択処理
+const selectProject = async (projectId: number, projectName: string) => {
+  selectedProjectId.value = projectId
+  selectedProjectName.value = projectName
+  projectSearchQuery.value = projectName
+  showProjectDropdown.value = false
+  selectedProjectIndex.value = -1
+  
+  // formDataを更新
+  formData.value.project_id = projectId.toString()
+  
+  // ステータスを取得
+  await handleProjectChange()
+}
+
+// プロジェクト検索フォーカス処理
+const handleProjectSearchFocus = () => {
+  showProjectDropdown.value = true
+  // 選択されているプロジェクト名を検索クエリに設定
+  if (selectedProjectName.value && !projectSearchQuery.value) {
+    projectSearchQuery.value = selectedProjectName.value
+  }
+}
+
+// プロジェクト検索入力処理
+const handleProjectSearchInput = () => {
+  showProjectDropdown.value = true
+  selectedProjectIndex.value = -1
+  // 検索クエリが変更されたら、選択をクリア
+  if (projectSearchQuery.value !== selectedProjectName.value) {
+    selectedProjectId.value = null
+    selectedProjectName.value = ''
+    formData.value.project_id = ''
+    formData.value.status = ''
+    availableStatuses.value = []
+  }
+}
+
+// プロジェクト選択をクリア
+const clearProjectSelection = () => {
+  selectedProjectId.value = null
+  selectedProjectName.value = ''
+  projectSearchQuery.value = ''
+  formData.value.project_id = ''
+  formData.value.status = ''
+  availableStatuses.value = []
+  showProjectDropdown.value = false
+  selectedProjectIndex.value = -1
+}
+
+// プロジェクト検索のblur処理（少し遅延させてクリックイベントを処理）
+const handleProjectSearchBlur = () => {
+  setTimeout(() => {
+    showProjectDropdown.value = false
+  }, 200)
+}
+
+// プロジェクト検索のEnterキー処理
+const handleProjectSearchEnter = () => {
+  if (selectedProjectIndex.value >= 0 && selectedProjectIndex.value < filteredProjects.value.length) {
+    const project = filteredProjects.value[selectedProjectIndex.value]
+    selectProject(project.id, project.name)
+  } else if (filteredProjects.value.length === 1) {
+    const project = filteredProjects.value[0]
+    selectProject(project.id, project.name)
+  }
+}
+
+// プロジェクト検索のドロップダウンナビゲーション
+const navigateProjectDropdown = (direction: number) => {
+  if (!showProjectDropdown.value) {
+    showProjectDropdown.value = true
+    return
+  }
+  
+  const maxIndex = filteredProjects.value.length - 1
+  selectedProjectIndex.value += direction
+  
+  if (selectedProjectIndex.value < 0) {
+    selectedProjectIndex.value = maxIndex
+  } else if (selectedProjectIndex.value > maxIndex) {
+    selectedProjectIndex.value = 0
+  }
+}
 
 // プロジェクト変更時にステータスを取得
 const handleProjectChange = async () => {
@@ -264,6 +407,13 @@ watch(() => props.show, (newValue) => {
       assignee: props.currentUser || '',
     }
     availableStatuses.value = []
+    
+    // プロジェクト検索をリセット
+    selectedProjectId.value = null
+    selectedProjectName.value = ''
+    projectSearchQuery.value = ''
+    showProjectDropdown.value = false
+    selectedProjectIndex.value = -1
   }
 })
 
@@ -280,7 +430,7 @@ const validateForm = (): boolean => {
   let isValid = true
   
   // プロジェクトのバリデーション
-  if (!formData.value.project_id) {
+  if (!formData.value.project_id || !selectedProjectId.value) {
     errors.project_id = '対象プロジェクトは必須です。'
     isValid = false
   }
@@ -305,7 +455,8 @@ const handleSave = () => {
     return
   }
   
-  const projectId = parseInt(formData.value.project_id.toString())
+  // selectedProjectIdが設定されている場合はそれを使用、なければformDataから取得
+  const projectId = selectedProjectId.value !== null ? selectedProjectId.value : parseInt(formData.value.project_id.toString())
   
   emit('save', {
     project_id: projectId,
@@ -496,5 +647,87 @@ label {
   &:hover:not(:disabled) {
     background: var(--current-linkColor);
   }
+}
+
+// プロジェクトオートコンプリート
+.project-autocomplete-container {
+  position: relative;
+}
+
+.project-autocomplete-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.project-autocomplete-input {
+  padding-right: 2.5rem;
+}
+
+.project-autocomplete-arrow,
+.project-autocomplete-clear {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: var(--current-textSecondary);
+  display: flex;
+  align-items: center;
+  padding: 0.25rem;
+  
+  &:hover {
+    color: var(--current-textPrimary);
+  }
+  
+  .material-symbols-outlined {
+    font-size: 1.25rem;
+  }
+}
+
+.project-autocomplete-clear {
+  &:hover {
+    color: var(--current-errorColor);
+  }
+}
+
+.project-autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 0.25rem;
+  background: var(--current-backgroundLight);
+  border: 1px solid var(--current-borderColor);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px var(--current-shadowMd);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1001;
+}
+
+.project-autocomplete-option {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  color: var(--current-textPrimary);
+  transition: background-color 0.2s;
+  
+  &:hover,
+  &.project-autocomplete-option-selected {
+    background: var(--current-backgroundGray);
+  }
+  
+  &.project-autocomplete-option-active {
+    background: var(--current-primaryColor);
+    color: var(--current-textWhite);
+    font-weight: 600;
+  }
+}
+
+.project-autocomplete-no-results {
+  padding: 0.75rem 1rem;
+  color: var(--current-textSecondary);
+  text-align: center;
+  font-style: italic;
 }
 </style>
