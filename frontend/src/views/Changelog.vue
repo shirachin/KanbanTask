@@ -19,20 +19,22 @@
         </div>
       </div>
       
-      <div class="version-section" v-for="version in versions" :key="version.id" v-show="selectedVersionId === version.id">
-        <h3 class="version-title">{{ version.version }}</h3>
-        <p class="version-date">{{ version.date }}</p>
-        <div 
-          v-for="category in version.categories" 
-          :key="category.title" 
-          class="changelog-category"
-        >
-          <h4 class="category-title">{{ category.title }}</h4>
-        <ul class="changelog-list">
-            <li v-for="(item, index) in category.items" :key="index" v-html="item"></li>
-        </ul>
+      <template v-for="version in versions" :key="version.id">
+        <div class="version-section" v-if="selectedVersionId === version.id">
+          <h3 class="version-title">{{ version.version }}</h3>
+          <p class="version-date">{{ version.date }}</p>
+          <div 
+            v-for="category in version.categories" 
+            :key="category.title" 
+            class="changelog-category"
+          >
+            <h4 class="category-title">{{ category.title }}</h4>
+          <ul class="changelog-list">
+              <li v-for="(item, index) in category.items" :key="index" v-html="item"></li>
+          </ul>
+          </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -53,6 +55,19 @@ interface VersionData {
 }
 
 const versions: VersionData[] = [
+  {
+    id: '0.1.3',
+    version: 'β0.1.3',
+    date: '2026年1月5日',
+    categories: [
+      {
+        title: 'フロントエンド機能',
+        items: [
+          '<strong>チェンジログ</strong>:<ul class="nested-list"><li>バージョン切り替え機能の修正（v-forとv-ifの競合問題を解決）</li></ul>'
+        ]
+      }
+    ]
+  },
   {
     id: '0.1.2',
     version: 'β0.1.2',
