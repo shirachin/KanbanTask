@@ -55,11 +55,12 @@
         <li>
           <a 
             href="#" 
-            class="nav-link" 
+            class="nav-link nav-link-disabled" 
             :class="{ active: currentView === 'gantt' }"
             @click.prevent="switchView('gantt')"
           >
             ガントチャート
+            <span class="nav-badge">未実装</span>
           </a>
         </li>
         <li>
@@ -378,7 +379,9 @@ watch(currentView, (newView: ViewType) => {
 }
 
 .nav-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0.75rem 1.5rem;
   color: var(--current-textPrimary);
   text-decoration: none;
@@ -393,6 +396,22 @@ watch(currentView, (newView: ViewType) => {
     background-color: var(--current-activeBackground);
     color: var(--current-textWhite);
   }
+
+  &.nav-link-disabled {
+    opacity: 0.7;
+    cursor: default;
+  }
+}
+
+.nav-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background: var(--current-backgroundGrayLight);
+  color: var(--current-textSecondary);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 0.5rem;
 }
 
 .nav-user {
