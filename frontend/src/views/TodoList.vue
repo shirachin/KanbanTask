@@ -122,6 +122,12 @@ const filterTemplates: FilterTemplate[] = [
       { colId: 'scheduled_date', sort: 'asc' },
     ],
   },
+  {
+    id: 'reset',
+    name: 'リセット',
+    sortModel: [],
+    filterModel: {},
+  },
 ]
 
 // カラム名のマッピング（colId -> headerName）
@@ -140,6 +146,11 @@ const tooltipText = ref<string>('')
 
 // フィルタ設定を人間が読める形式に変換
 const formatFilterSettings = (template: FilterTemplate): string => {
+  // リセットテンプレートの場合は特別なメッセージを返す
+  if (template.id === 'reset') {
+    return 'フィルタ・ソートをすべてリセットします'
+  }
+  
   const parts: string[] = []
   
   // ソート設定
@@ -227,12 +238,37 @@ const hideTooltip = () => {
 }
 
 // フィルタテンプレートを適用する関数
-const applyFilterTemplate = (template: FilterTemplate) => {
+const applyFilterTemplate = async (template: FilterTemplate) => {
   if (!gridRef.value?.api) return
   
-  isInitializing.value = true
+  // 一時的にisInitializingをfalseにして、AG GridのAPIが正しく動作するようにする
+  const wasInitializing = isInitializing.value
+  isInitializing.value = false
   
   try {
+    // Vueの更新サイクルを待つ
+    await nextTick()
+    
+    // フィルタを先にクリア/適用（フィルタが先に適用されると、ソートが正しく動作する）
+    if (template.filterModel && Object.keys(template.filterModel).length > 0) {
+      if (typeof gridRef.value.api.setFilterModel === 'function') {
+        gridRef.value.api.setFilterModel(template.filterModel)
+      }
+      
+      // LocalStorageに保存（テンプレート適用時も確実に保存）
+      filterModel.value = template.filterModel
+      setLocalStorage(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, template.filterModel)
+    } else {
+      // フィルタをクリア（nullを使用して完全にクリア）
+      if (typeof gridRef.value.api.setFilterModel === 'function') {
+        gridRef.value.api.setFilterModel(null)
+      }
+      
+      // LocalStorageにも保存
+      filterModel.value = {}
+      setLocalStorage(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, null)
+    }
+    
     // ソートモデルを適用
     if (template.sortModel && template.sortModel.length > 0) {
       const sortColumnState = template.sortModel.map((sort, index) => ({
@@ -244,6 +280,7 @@ const applyFilterTemplate = (template: FilterTemplate) => {
       if (typeof gridRef.value.api.applyColumnState === 'function') {
         gridRef.value.api.applyColumnState({ 
           state: sortColumnState,
+          defaultState: { sort: null },
           applyOrder: false
         })
       }
@@ -252,42 +289,44 @@ const applyFilterTemplate = (template: FilterTemplate) => {
       sortModel.value = template.sortModel
       setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, template.sortModel)
     } else {
-      // ソートをクリア
+      // ソートをクリア（defaultState: { sort: null }を使用）
+      if (typeof gridRef.value.api.applyColumnState === 'function') {
+        gridRef.value.api.applyColumnState({ 
+          state: [],
+          defaultState: { sort: null }
+        })
+      } else if (typeof gridRef.value.api.clearAllSorts === 'function') {
+        gridRef.value.api.clearAllSorts()
+      }
+      
       sortModel.value = []
       setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, null)
     }
     
-    // フィルタモデルを適用（指定されている場合）
-    if (template.filterModel && Object.keys(template.filterModel).length > 0) {
-      if (typeof gridRef.value.api.setFilterModel === 'function') {
-        gridRef.value.api.setFilterModel(template.filterModel)
-      }
-      
-      // LocalStorageに保存（テンプレート適用時も確実に保存）
-      filterModel.value = template.filterModel
-      setLocalStorage(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, template.filterModel)
-    } else {
-      // フィルタをクリア
-      if (typeof gridRef.value.api.setFilterModel === 'function') {
-        gridRef.value.api.setFilterModel({})
-      }
-      
-      // LocalStorageにも保存
-      filterModel.value = {}
-      setLocalStorage(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, null)
+    // クライアントサイドの行モデルを更新して変更を反映
+    if (typeof gridRef.value.api.refreshClientSideRowModel === 'function') {
+      gridRef.value.api.refreshClientSideRowModel('filter')
     }
     
-    // AG Gridに状態変更を通知して再描画を促す
-    gridRef.value.api.onFilterChanged()
-    gridRef.value.api.onSortChanged()
+    // AG Gridのイベントを手動で発火（isInitializingがfalseなので、イベントハンドラーが動作する）
+    if (typeof gridRef.value.api.onFilterChanged === 'function') {
+      gridRef.value.api.onFilterChanged()
+    }
+    if (typeof gridRef.value.api.onSortChanged === 'function') {
+      gridRef.value.api.onSortChanged()
+    }
+    
+    // AG Gridを強制的に再描画（force: trueで強制更新）
+    await nextTick()
+    if (typeof gridRef.value.api.refreshCells === 'function') {
+      gridRef.value.api.refreshCells({ force: true })
+    }
     
   } catch (e) {
     console.error('Error applying filter template:', e)
   } finally {
-    // イベントハンドラーが動作するように、少し遅延させてからisInitializingをfalseにする
-    setTimeout(() => {
-      isInitializing.value = false
-    }, 300)
+    // 元のisInitializingの状態に戻す
+    isInitializing.value = wasInitializing
   }
 }
 
