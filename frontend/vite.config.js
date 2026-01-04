@@ -10,5 +10,8 @@ export default defineConfig({
     watch: {
       usePolling: true
     }
+  },
+  optimizeDeps: {
+    include: ['ag-grid-vue3', 'ag-grid-community']
   }
 })

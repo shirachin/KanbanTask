@@ -3,7 +3,7 @@
 ダミープロジェクト（id=-1）を作成して外部キー制約を満たす
 """
 from sqlalchemy import text
-from database import engine
+from app.core.database import engine
 
 def migrate():
     with engine.connect() as conn:

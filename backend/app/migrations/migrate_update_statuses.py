@@ -3,7 +3,7 @@
 既存のステータスを削除し、新しいステータスを作成します
 """
 from sqlalchemy import text
-from database import engine
+from app.core.database import engine
 
 def migrate():
     with engine.connect() as conn:

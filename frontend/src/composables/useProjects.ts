@@ -23,7 +23,7 @@ export const useProjects = () => {
     loading.value = true
     error.value = null
     try {
-      let url = `${API_URL}/api/projects`
+      let url = `${API_URL}/api/v1/projects`
       if (assignee) {
         url += `?assignee=${encodeURIComponent(assignee)}`
       }
@@ -56,7 +56,7 @@ export const useProjects = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/projects`, {
+      const response = await fetch(`${API_URL}/api/v1/projects`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -100,7 +100,7 @@ export const useProjects = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/projects/${id}`, {
+      const response = await fetch(`${API_URL}/api/v1/projects/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -147,7 +147,7 @@ export const useProjects = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/projects/${id}`, {
+      const response = await fetch(`${API_URL}/api/v1/projects/${id}`, {
         method: 'DELETE',
       })
       if (!response.ok) {

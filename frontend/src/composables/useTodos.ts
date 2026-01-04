@@ -24,7 +24,7 @@ export const useTodos = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/tasks/${taskId}/todos`)
+      const response = await fetch(`${API_URL}/api/v1/tasks/${taskId}/todos`)
       if (!response.ok) {
         // 404の場合は空の配列を返す（TODOがまだ存在しない場合）
         if (response.status === 404) {
@@ -52,7 +52,7 @@ export const useTodos = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/tasks/${taskId}/todos`, {
+      const response = await fetch(`${API_URL}/api/v1/tasks/${taskId}/todos`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,7 +86,7 @@ export const useTodos = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/todos/${todoId}`, {
+      const response = await fetch(`${API_URL}/api/v1/todos/${todoId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -123,7 +123,7 @@ export const useTodos = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/todos/${todoId}`, {
+      const response = await fetch(`${API_URL}/api/v1/todos/${todoId}`, {
         method: 'DELETE',
       })
       if (!response.ok) {
@@ -157,7 +157,7 @@ export const useTodos = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/todos?skip=${skip}&limit=${limit}`)
+      const response = await fetch(`${API_URL}/api/v1/todos?skip=${skip}&limit=${limit}`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }

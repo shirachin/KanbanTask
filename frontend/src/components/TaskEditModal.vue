@@ -301,7 +301,7 @@ const handleProjectChange = async () => {
   
   try {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const response = await fetch(`${API_URL}/api/statuses?project_id=${projectId}`)
+    const response = await fetch(`${API_URL}/api/v1/statuses?project_id=${projectId}`)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -310,28 +310,18 @@ const handleProjectChange = async () => {
       availableStatuses.value = data.sort((a: Status, b: Status) => a.order - b.order)
     } else {
       // デフォルトステータスを使用
-      availableStatuses.value = [
-        { id: -1, name: 'considering', display_name: '検討中', order: 0, color: '#9e9e9e', project_id: projectId },
-        { id: -2, name: 'not_started', display_name: '未実行', order: 1, color: '#667eea', project_id: projectId },
-        { id: -3, name: 'in_progress', display_name: '実行中', order: 2, color: '#ffa726', project_id: projectId },
-        { id: -4, name: 'review_pending', display_name: 'レビュー待ち', order: 3, color: '#9c27b0', project_id: projectId },
-        { id: -5, name: 'staging_deployed', display_name: '検証環境反映済み', order: 4, color: '#ffeb3b', project_id: projectId },
-        { id: -6, name: 'production_deployed', display_name: '本番環境反映済み', order: 5, color: '#51cf66', project_id: projectId },
-        { id: -7, name: 'cancelled', display_name: '中止', order: 6, color: '#dc3545', project_id: projectId }
-      ]
+      availableStatuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
+        ...status,
+        project_id: projectId,
+      }))
     }
   } catch (e) {
     console.error('Error fetching statuses:', e)
     // デフォルトステータスを使用
-    availableStatuses.value = [
-      { id: -1, name: 'considering', display_name: '検討中', order: 0, color: '#9e9e9e', project_id: projectId },
-      { id: -2, name: 'not_started', display_name: '未実行', order: 1, color: '#667eea', project_id: projectId },
-      { id: -3, name: 'in_progress', display_name: '実行中', order: 2, color: '#ffa726', project_id: projectId },
-      { id: -4, name: 'review_pending', display_name: 'レビュー待ち', order: 3, color: '#9c27b0', project_id: projectId },
-      { id: -5, name: 'staging_deployed', display_name: '検証環境反映済み', order: 4, color: '#ffeb3b', project_id: projectId },
-      { id: -6, name: 'production_deployed', display_name: '本番環境反映済み', order: 5, color: '#51cf66', project_id: projectId },
-      { id: -7, name: 'cancelled', display_name: '中止', order: 6, color: '#dc3545', project_id: projectId }
-    ]
+    availableStatuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
+      ...status,
+      project_id: projectId,
+    }))
   } finally {
     loadingStatuses.value = false
   }

@@ -69,8 +69,10 @@ const { projects, fetchProjects } = useProjects()
 const gridRef = ref<InstanceType<typeof AgGridVue> | null>(null)
 
 // ページネーションサイズ
-const savedPageSize = getLocalStorage<number>(STORAGE_KEYS.TODO_LIST_PAGE_SIZE, 50)
-const paginationPageSize = ref<number>([25, 50, 100, 200].includes(savedPageSize) ? savedPageSize : 50)
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, MAX_RETRY_COUNT, RESTORE_STATE_TIMEOUTS } from '../constants/grid'
+
+const savedPageSize = getLocalStorage<number>(STORAGE_KEYS.TODO_LIST_PAGE_SIZE, DEFAULT_PAGE_SIZE)
+const paginationPageSize = ref<number>(PAGE_SIZE_OPTIONS.includes(savedPageSize as typeof PAGE_SIZE_OPTIONS[number]) ? savedPageSize : DEFAULT_PAGE_SIZE)
 
 // 初期化フラグ（初期化時のイベントを無視するため）
 const isInitializing = ref(true)
@@ -543,7 +545,6 @@ const defaultColDef = ref({
 // 状態復元フラグ（重複復元を防ぐ）
 let hasRestoredState = false
 let retryCount = 0
-const MAX_RETRY_COUNT = 50
 
 // 状態を復元する関数
 const restoreGridState = () => {
@@ -565,7 +566,7 @@ const restoreGridState = () => {
       if (!hasRestoredState && gridRef.value) {
         restoreGridState()
       }
-    }, 100)
+    }, RESTORE_STATE_TIMEOUTS.INITIAL)
     return
   }
   
@@ -583,7 +584,7 @@ const restoreGridState = () => {
       if (!hasRestoredState && gridRef.value) {
         restoreGridState()
       }
-    }, 100)
+    }, RESTORE_STATE_TIMEOUTS.INITIAL)
     return
   }
   
@@ -677,7 +678,7 @@ const restoreGridState = () => {
     // 初期化完了（少し遅延させてイベントが処理されるようにする）
     setTimeout(() => {
       isInitializing.value = false
-    }, 200)
+    }, RESTORE_STATE_TIMEOUTS.COMPLETE)
   }
 }
 
@@ -689,7 +690,7 @@ const onGridReady = () => {
       if (!hasRestoredState) {
         restoreGridState()
       }
-    }, 300) // 300ms待機
+    }, RESTORE_STATE_TIMEOUTS.GRID_READY)
   }
 }
 
@@ -702,7 +703,7 @@ const onFirstDataRendered = () => {
       if (!hasRestoredState) {
         restoreGridState()
       }
-    }, 500) // 500ms待機
+    }, RESTORE_STATE_TIMEOUTS.FIRST_DATA_RENDERED)
   }
 }
 

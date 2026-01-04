@@ -56,6 +56,7 @@ import AssigneeCellRenderer from '../components/AssigneeCellRenderer.vue'
 import ProjectEditModal from '../components/ProjectEditModal.vue'
 import { useProjects, type Project } from '../composables/useProjects'
 import { getLocalStorage, setLocalStorage, STORAGE_KEYS } from '../composables/useLocalStorage'
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, MAX_RETRY_COUNT, RESTORE_STATE_TIMEOUTS } from '../constants/grid'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
@@ -66,8 +67,8 @@ const { projects, loading, error, fetchProjects, createProject, updateProject, d
 const gridRef = ref<InstanceType<typeof AgGridVue> | null>(null)
 
 // ページネーションサイズ
-const savedPageSize = getLocalStorage<number>(STORAGE_KEYS.PROJECT_MANAGEMENT_PAGE_SIZE, 50)
-const paginationPageSize = ref<number>([25, 50, 100, 200].includes(savedPageSize) ? savedPageSize : 50)
+const savedPageSize = getLocalStorage<number>(STORAGE_KEYS.PROJECT_MANAGEMENT_PAGE_SIZE, DEFAULT_PAGE_SIZE)
+const paginationPageSize = ref<number>(PAGE_SIZE_OPTIONS.includes(savedPageSize as typeof PAGE_SIZE_OPTIONS[number]) ? savedPageSize : DEFAULT_PAGE_SIZE)
 
 // 初期化フラグ（初期化時のイベントを無視するため）
 const isInitializing = ref(true)
@@ -367,7 +368,7 @@ const restoreGridState = () => {
       if (!hasRestoredState && gridRef.value) {
         restoreGridState()
       }
-    }, 100)
+    }, RESTORE_STATE_TIMEOUTS.INITIAL)
     return
   }
   
@@ -384,7 +385,7 @@ const restoreGridState = () => {
       if (!hasRestoredState && gridRef.value) {
         restoreGridState()
       }
-    }, 100)
+    }, RESTORE_STATE_TIMEOUTS.INITIAL)
     return
   }
   
@@ -458,7 +459,7 @@ const restoreGridState = () => {
   } finally {
     setTimeout(() => {
       isInitializing.value = false
-    }, 200)
+    }, RESTORE_STATE_TIMEOUTS.COMPLETE)
   }
 }
 

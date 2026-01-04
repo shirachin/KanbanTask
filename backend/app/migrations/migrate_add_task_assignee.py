@@ -2,7 +2,7 @@
 タスクテーブルにassigneeフィールドを追加するマイグレーション
 """
 from sqlalchemy import text
-from database import engine
+from app.core.database import engine
 
 def migrate():
     with engine.connect() as conn:

@@ -26,7 +26,7 @@ export const useTasks = () => {
     loading.value = true
     error.value = null
     try {
-      let url = `${API_URL}/api/tasks`
+      let url = `${API_URL}/api/v1/tasks`
       const params = new URLSearchParams()
       
       if (projectId !== undefined) {
@@ -65,7 +65,7 @@ export const useTasks = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/tasks`, {
+      const response = await fetch(`${API_URL}/api/v1/tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -92,7 +92,7 @@ export const useTasks = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/tasks/${id}`, {
+      const response = await fetch(`${API_URL}/api/v1/tasks/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -122,7 +122,7 @@ export const useTasks = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/tasks/${id}`, {
+      const response = await fetch(`${API_URL}/api/v1/tasks/${id}`, {
         method: 'DELETE',
       })
       if (!response.ok) {
