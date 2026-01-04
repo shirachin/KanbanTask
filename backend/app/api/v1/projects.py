@@ -71,10 +71,7 @@ def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
         db.add(db_project)
         db.flush()
         
-        # デフォルトステータスを作成
-        for status_data in DEFAULT_STATUS_DEFINITIONS:
-            db_status = Status(**status_data, project_id=db_project.id)
-            db.add(db_status)
+        # ステータスは共通化されているため、プロジェクト作成時にステータスを作成しない
         
         db.commit()
         db.refresh(db_project)

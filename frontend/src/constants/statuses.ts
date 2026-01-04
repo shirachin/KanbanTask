@@ -12,7 +12,8 @@ export interface DefaultStatus {
 }
 
 /**
- * 個人タスク用のデフォルトステータス（project_id=-1）
+ * 共通ステータスのフォールバック用定義（APIから取得できない場合に使用）
+ * すべてのプロジェクト・個人タスクで共通の7種類のステータス
  */
 export const DEFAULT_PERSONAL_STATUSES: DefaultStatus[] = [
   { id: -1, name: 'considering', display_name: '検討中', order: 0, color: '#9e9e9e', project_id: -1 },

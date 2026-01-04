@@ -176,12 +176,17 @@
       </div>
       
       <div class="modal-footer">
-        <button type="button" class="button button-cancel" @click="handleCancel">
-          キャンセル
+        <button type="button" class="button button-delete" @click="handleDelete" :disabled="loadingStatuses">
+          削除
         </button>
-        <button type="button" class="button button-save" @click="handleSave" :disabled="loadingStatuses">
-          保存
-        </button>
+        <div class="modal-footer-right">
+          <button type="button" class="button button-cancel" @click="handleCancel">
+            キャンセル
+          </button>
+          <button type="button" class="button button-save" @click="handleSave" :disabled="loadingStatuses">
+            保存
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -191,7 +196,9 @@
 import { ref, watch, computed, reactive, onMounted } from 'vue'
 import type { Project } from '../composables/useProjects'
 import type { Task } from '../composables/useTasks'
+import { useTasks } from '../composables/useTasks'
 import { useTodos, type Todo } from '../composables/useTodos'
+import { DEFAULT_PERSONAL_STATUSES } from '../constants/statuses'
 
 type Status = {
   id: number
@@ -219,6 +226,7 @@ const emit = defineEmits<{
     status: string
     assignee?: string | null
   }]
+  'delete': [taskId: number]
 }>()
 
 const formData = ref({
@@ -238,6 +246,9 @@ const errors = reactive({
 
 const loadingStatuses = ref(false)
 const availableStatuses = ref<Status[]>([])
+
+// タスク管理
+const { deleteTask } = useTasks()
 
 // TODO管理
 const { fetchTodos, createTodo, updateTodo, deleteTodo, getTodos } = useTodos()
@@ -301,7 +312,8 @@ const handleProjectChange = async () => {
   
   try {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const response = await fetch(`${API_URL}/api/v1/statuses?project_id=${projectId}`)
+    // 共通ステータスを取得（project_idパラメータは不要）
+    const response = await fetch(`${API_URL}/api/v1/statuses`)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -309,18 +321,18 @@ const handleProjectChange = async () => {
     if (data.length > 0) {
       availableStatuses.value = data.sort((a: Status, b: Status) => a.order - b.order)
     } else {
-      // デフォルトステータスを使用
+      // デフォルトステータスを使用（フォールバック）
       availableStatuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
         ...status,
-        project_id: projectId,
+        project_id: null,
       }))
     }
   } catch (e) {
     console.error('Error fetching statuses:', e)
-    // デフォルトステータスを使用
+    // デフォルトステータスを使用（フォールバック）
     availableStatuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
       ...status,
-      project_id: projectId,
+      project_id: null,
     }))
   } finally {
     loadingStatuses.value = false
@@ -520,6 +532,23 @@ const handleSave = () => {
   })
   emit('update:show', false)
 }
+
+const handleDelete = async () => {
+  if (!props.task) return
+  
+  if (!confirm(`タスク「${props.task.title}」を削除しますか？\nこの操作は取り消せません。`)) {
+    return
+  }
+  
+  try {
+    await deleteTask(props.task.id)
+    emit('delete', props.task.id)
+    emit('update:show', false)
+  } catch (e) {
+    console.error('Error deleting task:', e)
+    alert('タスクの削除に失敗しました')
+  }
+}
 </script>
 
 <style lang="scss" scoped>
@@ -593,10 +622,16 @@ const handleSave = () => {
 
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 1rem;
   padding: 1.5rem;
   border-top: 1px solid var(--current-borderColor);
+}
+
+.modal-footer-right {
+  display: flex;
+  gap: 1rem;
 }
 
 .form-group {
@@ -699,6 +734,16 @@ label {
 
   &:hover:not(:disabled) {
     background: var(--current-linkColor);
+  }
+}
+
+.button-delete {
+  background: var(--current-errorColor);
+  color: var(--current-textWhite);
+
+  &:hover:not(:disabled) {
+    background: #c82333;
+    opacity: 0.9;
   }
 }
 

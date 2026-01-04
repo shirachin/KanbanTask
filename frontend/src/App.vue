@@ -15,7 +15,7 @@
         </button>
         <div class="header-title">
           <div class="header-icon" v-html="iconSvg"></div>
-          <h1>タスク管理アプリ</h1>
+        <h1>タスク管理アプリ</h1>
         </div>
         <ThemeSelector />
       </div>
@@ -105,7 +105,7 @@
       <Help v-else-if="currentView === 'help'" />
     </main>
     <footer class="footer">
-      <span class="version" @click="switchView('changelog')">β0.1.0</span>
+      <span class="version" @click="switchView('changelog')">β0.1.2</span>
       <span class="current-time">{{ currentTime }}</span>
     </footer>
   </div>
@@ -208,7 +208,7 @@ const handleClickOutside = (event: MouseEvent) => {
     const savedUser = getLocalStorage<string | null>(STORAGE_KEYS.APP_CURRENT_USER, null)
     if (savedUser) {
       currentUser.value = savedUser
-    }
+      }
 
     // クリックイベントリスナーを追加
     document.addEventListener('click', handleClickOutside)

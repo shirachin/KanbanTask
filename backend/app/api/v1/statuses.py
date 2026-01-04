@@ -19,20 +19,29 @@ router = APIRouter()
 
 @router.get("", response_model=List[StatusResponse])
 def get_statuses(project_id: Optional[int] = None, db: Session = Depends(get_db)):
-    """Get statuses for a project"""
+    """Get common statuses (all projects and personal tasks share the same 7 statuses)"""
     try:
-        if project_id == -1:
-            # 個人タスク用のデフォルトステータス
-            personal_statuses = [
-                {**status, "created_at": datetime.now()}
-                for status in DEFAULT_PERSONAL_STATUSES
-            ]
-            return [StatusResponse(**status) for status in personal_statuses]
-        
-        query = db.query(Status)
-        if project_id is not None:
-            query = query.filter(Status.project_id == project_id)
+        # 共通ステータスを取得（project_id IS NULL）
+        query = db.query(Status).filter(Status.project_id.is_(None))
         statuses = query.order_by(Status.order).all()
+        
+        # 共通ステータスが存在しない場合は、デフォルトステータスを返す（マイグレーション前の互換性のため）
+        if not statuses:
+            from app.core.constants import DEFAULT_STATUS_DEFINITIONS
+            # 仮想的なステータスレスポンスを返す
+            return [
+                StatusResponse(
+                    id=idx,
+                    name=status["name"],
+                    display_name=status["display_name"],
+                    order=status["order"],
+                    color=status["color"],
+                    project_id=None,
+                    created_at=datetime.now()
+                )
+                for idx, status in enumerate(DEFAULT_STATUS_DEFINITIONS)
+            ]
+        
         return statuses
     except Exception as e:
         logger.error(f"Error fetching statuses: {e}", exc_info=True)
