@@ -349,21 +349,15 @@ const handleTaskUpdate = async (taskData: {
   assignee?: string | null
 }) => {
   try {
-    // ステータスIDを取得
+    // ステータスIDを取得（共通ステータスから取得）
     let statusId: number | null = null
-    if (taskData.project_id === -1) {
-      // 個人タスクの場合はstatus_idはnull
-      statusId = null
-    } else {
-      // プロジェクトのステータスからIDを取得
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-      const statusResponse = await fetch(`${API_URL}/api/v1/statuses?project_id=${taskData.project_id}`)
-      if (statusResponse.ok) {
-        const statuses = await statusResponse.json()
-        const status = statuses.find((s: any) => s.name === taskData.status)
-        if (status) {
-          statusId = status.id
-        }
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const statusResponse = await fetch(`${API_URL}/api/v1/statuses`)
+    if (statusResponse.ok) {
+      const statuses = await statusResponse.json()
+      const status = statuses.find((s: any) => s.name === taskData.status)
+      if (status) {
+        statusId = status.id
       }
     }
     
@@ -410,11 +404,12 @@ const getTasksByStatus = (statusId: number): Task[] => {
 
 // 個人タスク用のプロジェクト取得は不要（project_id=-1で扱う）
 
-// ステータスを取得
-const fetchStatuses = async (projectId: number) => {
+// ステータスを取得（共通ステータスを取得）
+const fetchStatuses = async () => {
   try {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const response = await fetch(`${API_URL}/api/v1/statuses?project_id=${projectId}`)
+    // 共通ステータスを取得（project_idパラメータは不要）
+    const response = await fetch(`${API_URL}/api/v1/statuses`)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -422,18 +417,18 @@ const fetchStatuses = async (projectId: number) => {
     if (data && Array.isArray(data) && data.length > 0) {
       statuses.value = data.sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
     } else {
-      // デフォルトステータスを使用（project_id=-1の場合など）
+      // デフォルトステータスを使用（フォールバック）
       statuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
         ...status,
-        project_id: projectId,
+        project_id: null,
       }))
     }
   } catch (e) {
     console.error('Error fetching statuses:', e)
-    // デフォルトステータスを使用
+    // デフォルトステータスを使用（フォールバック）
     statuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
       ...status,
-      project_id: projectId,
+      project_id: null,
     }))
   }
 }
@@ -586,20 +581,8 @@ const loadTasks = async () => {
       }
     }
     
-    // ステータスを取得
-    // 個人タスク（-1）が含まれている場合は、個人タスク用のステータス（-1）を使用
-    // それ以外の場合は最初のプロジェクトIDを使用
-    let statusProjectId: number | undefined = undefined
-    if (displayProjectIds.value.includes(-1)) {
-      // 個人タスクが含まれている場合は、個人タスク用のステータスを使用
-      statusProjectId = -1
-    } else {
-      // 個人タスクが含まれていない場合は、最初のプロジェクトIDを使用
-      statusProjectId = displayProjectIds.value[0]
-    }
-    if (statusProjectId !== undefined) {
-      await fetchStatuses(statusProjectId)
-    }
+    // ステータスを取得（共通ステータスを取得）
+    await fetchStatuses()
     
   } catch (e) {
     console.error('Error in loadTasks:', e)
@@ -636,21 +619,15 @@ const handleTaskSave = async (taskData: {
   assignee?: string | null
 }) => {
   try {
-    // ステータスIDを取得
+    // ステータスIDを取得（共通ステータスから取得）
     let statusId: number | null = null
-    if (taskData.project_id === -1) {
-      // 個人タスクの場合はstatus_idはnull
-      statusId = null
-    } else {
-      // プロジェクトのステータスからIDを取得
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-      const statusResponse = await fetch(`${API_URL}/api/v1/statuses?project_id=${taskData.project_id}`)
-      if (statusResponse.ok) {
-        const statuses = await statusResponse.json()
-        const status = statuses.find((s: any) => s.name === taskData.status)
-        if (status) {
-          statusId = status.id
-        }
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const statusResponse = await fetch(`${API_URL}/api/v1/statuses`)
+    if (statusResponse.ok) {
+      const statuses = await statusResponse.json()
+      const status = statuses.find((s: any) => s.name === taskData.status)
+      if (status) {
+        statusId = status.id
       }
     }
     

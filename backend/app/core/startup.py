@@ -65,29 +65,38 @@ def run_migrations():
         migrate_add_todo_dates()
     except Exception as e:
         print(f"TODO日付カラム追加マイグレーションエラー（無視可能）: {e}")
+    
+    try:
+        from app.migrations.migrate_common_statuses import migrate as migrate_common_statuses
+        migrate_common_statuses()
+    except Exception as e:
+        print(f"ステータス共通化マイグレーションエラー（無視可能）: {e}")
 
 
 def initialize_default_statuses():
-    """Initialize default statuses for all projects"""
+    """Initialize common statuses (shared by all projects and personal tasks)"""
     from app.core.database import SessionLocal
-    from app.models import Project, Status
+    from app.models import Status
     from app.core.constants import DEFAULT_STATUS_DEFINITIONS
     
     db = SessionLocal()
     try:
-        projects = db.query(Project).all()
+        # 共通ステータスが存在するか確認（project_id IS NULL）
+        existing_statuses = db.query(Status).filter(Status.project_id.is_(None)).all()
         
-        for project in projects:
+        if not existing_statuses:
+            # 共通ステータスが存在しない場合は作成
             for status_data in DEFAULT_STATUS_DEFINITIONS:
                 existing = db.query(Status).filter(
                     Status.name == status_data["name"],
-                    Status.project_id == project.id
+                    Status.project_id.is_(None)
                 ).first()
                 if not existing:
-                    status = Status(**status_data, project_id=project.id)
+                    status = Status(**status_data, project_id=None)
                     db.add(status)
-        
-        db.commit()
+            
+            db.commit()
+            print("共通ステータスを初期化しました")
     except Exception as e:
         print(f"初期化エラー（無視可能）: {e}")
     finally:

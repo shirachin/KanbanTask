@@ -7,7 +7,7 @@ class StatusBase(BaseModel):
     display_name: str
     order: int = 0
     color: str = "#667eea"
-    project_id: int  # プロジェクトID
+    project_id: Optional[int] = None  # プロジェクトID（共通ステータスの場合はNone）
 
 class StatusCreate(StatusBase):
     pass

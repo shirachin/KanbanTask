@@ -301,7 +301,8 @@ const handleProjectChange = async () => {
   
   try {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const response = await fetch(`${API_URL}/api/v1/statuses?project_id=${projectId}`)
+    // 共通ステータスを取得（project_idパラメータは不要）
+    const response = await fetch(`${API_URL}/api/v1/statuses`)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -309,18 +310,18 @@ const handleProjectChange = async () => {
     if (data.length > 0) {
       availableStatuses.value = data.sort((a: Status, b: Status) => a.order - b.order)
     } else {
-      // デフォルトステータスを使用
+      // デフォルトステータスを使用（フォールバック）
       availableStatuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
         ...status,
-        project_id: projectId,
+        project_id: null,
       }))
     }
   } catch (e) {
     console.error('Error fetching statuses:', e)
-    // デフォルトステータスを使用
+    // デフォルトステータスを使用（フォールバック）
     availableStatuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
       ...status,
-      project_id: projectId,
+      project_id: null,
     }))
   } finally {
     loadingStatuses.value = false

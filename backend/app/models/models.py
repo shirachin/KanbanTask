@@ -16,7 +16,7 @@ class Project(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
-    statuses = relationship("Status", back_populates="project", cascade="all, delete-orphan")
+    statuses = relationship("Status", back_populates="project")  # cascadeを削除（共通ステータスは削除しない）
 
 class Status(Base):
     __tablename__ = "statuses"
@@ -26,7 +26,7 @@ class Status(Base):
     display_name = Column(String, nullable=False)
     order = Column(Integer, default=0)
     color = Column(String, default="#667eea")
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)  # 共通ステータスの場合はNULL
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     project = relationship("Project", back_populates="statuses")

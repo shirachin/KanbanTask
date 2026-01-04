@@ -85,20 +85,17 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
     
     task_dict = task.dict()
     
-    # status_idが指定されていない場合、status名から取得
+    # status_idが指定されていない場合、status名から共通ステータスIDを取得
     if task_dict.get("status_id") is None and task_dict.get("status"):
         status_name = task_dict["status"]
-        project_id = task_dict["project_id"]
         
-        if project_id == -1:
-            task_dict["status_id"] = None
-        else:
-            status = db.query(Status).filter(
-                Status.name == status_name,
-                Status.project_id == project_id
-            ).first()
-            if status:
-                task_dict["status_id"] = status.id
+        # 共通ステータスを取得（project_id IS NULL）
+        status = db.query(Status).filter(
+            Status.name == status_name,
+            Status.project_id.is_(None)
+        ).first()
+        if status:
+            task_dict["status_id"] = status.id
     
     try:
         db_task = Task(**task_dict)
@@ -133,19 +130,19 @@ def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get
     update_data = task_update.dict(exclude_unset=True)
     
     # status_idが更新される場合の処理
-    if "status" in update_data and "status_id" in update_data:
+    if "status" in update_data:
         status_name = update_data["status"]
-        project_id = update_data.get("project_id", db_task.project_id)
         
-        if project_id == -1:
-            update_data["status_id"] = None
+        # 共通ステータスを取得（project_id IS NULL）
+        status = db.query(Status).filter(
+            Status.name == status_name,
+            Status.project_id.is_(None)
+        ).first()
+        if status:
+            update_data["status_id"] = status.id
         else:
-            status = db.query(Status).filter(
-                Status.name == status_name,
-                Status.project_id == project_id
-            ).first()
-            if status:
-                update_data["status_id"] = status.id
+            # ステータスが見つからない場合はNULL（個人タスクの場合など）
+            update_data["status_id"] = None
     
     try:
         for field, value in update_data.items():
