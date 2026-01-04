@@ -4,14 +4,26 @@
       <h2>TODOリスト</h2>
       <div class="filter-templates">
         <span class="filter-templates-label">フィルタテンプレート:</span>
-        <button
+        <div
           v-for="template in filterTemplates"
           :key="template.id"
-          class="filter-template-button"
-          @click="applyFilterTemplate(template)"
+          class="filter-template-wrapper"
         >
-          {{ template.name }}
-        </button>
+          <button
+            class="filter-template-button"
+            @click="applyFilterTemplate(template)"
+            @mouseenter="showTooltip(template)"
+            @mouseleave="hideTooltip"
+          >
+            {{ template.name }}
+          </button>
+          <div
+            v-if="hoveredTemplate?.id === template.id && tooltipText"
+            class="filter-template-tooltip"
+          >
+            {{ tooltipText }}
+          </div>
+        </div>
       </div>
     </div>
     
@@ -111,6 +123,108 @@ const filterTemplates: FilterTemplate[] = [
     ],
   },
 ]
+
+// カラム名のマッピング（colId -> headerName）
+const columnNameMap: Record<string, string> = {
+  'completed': '完了',
+  'title': 'TODO',
+  'task_name': 'タスク名',
+  'project_name': 'プロジェクト名',
+  'scheduled_date': '実行予定日',
+  'completed_date': '実行完了日',
+}
+
+// ツールチップ表示用の状態
+const hoveredTemplate = ref<FilterTemplate | null>(null)
+const tooltipText = ref<string>('')
+
+// フィルタ設定を人間が読める形式に変換
+const formatFilterSettings = (template: FilterTemplate): string => {
+  const parts: string[] = []
+  
+  // ソート設定
+  if (template.sortModel && template.sortModel.length > 0) {
+    const sortParts = template.sortModel.map((sort, index) => {
+      const columnName = columnNameMap[sort.colId] || sort.colId
+      const sortDirection = sort.sort === 'asc' ? '昇順' : '降順'
+      return index === 0 
+        ? `${columnName}（${sortDirection}）`
+        : ` → ${columnName}（${sortDirection}）`
+    })
+    parts.push(`ソート: ${sortParts.join('')}`)
+  }
+  
+  // フィルタ設定
+  if (template.filterModel && Object.keys(template.filterModel).length > 0) {
+    const filterParts: string[] = []
+    for (const [colId, filter] of Object.entries(template.filterModel)) {
+      const columnName = columnNameMap[colId] || colId
+      const filterType = (filter as any).filterType || 'text'
+      
+      if (filterType === 'set') {
+        // Setフィルタ（複数選択）
+        const values = (filter as any).values || []
+        if (values.length > 0) {
+          filterParts.push(`${columnName}: ${values.join(', ')}`)
+        }
+      } else if (filterType === 'text') {
+        // テキストフィルタ
+        const type = (filter as any).type || 'contains'
+        const filterText = (filter as any).filter || ''
+        if (filterText) {
+          const typeMap: Record<string, string> = {
+            'contains': 'を含む',
+            'equals': 'と等しい',
+            'notEqual': 'と等しくない',
+            'startsWith': 'で始まる',
+            'endsWith': 'で終わる',
+          }
+          filterParts.push(`${columnName}: "${filterText}"${typeMap[type] || ''}`)
+        }
+      } else if (filterType === 'date') {
+        // 日付フィルタ
+        const type = (filter as any).type || 'equals'
+        const dateFrom = (filter as any).dateFrom
+        const dateTo = (filter as any).dateTo
+        const typeMap: Record<string, string> = {
+          'equals': 'と等しい',
+          'notEqual': 'と等しくない',
+          'lessThan': 'より前',
+          'greaterThan': 'より後',
+          'inRange': 'の範囲内',
+        }
+        if (dateFrom && dateTo) {
+          filterParts.push(`${columnName}: ${dateFrom} ～ ${dateTo}`)
+        } else if (dateFrom) {
+          filterParts.push(`${columnName}: ${dateFrom}${typeMap[type] || ''}`)
+        } else if (dateTo) {
+          filterParts.push(`${columnName}: ${dateTo}${typeMap[type] || ''}`)
+        }
+      }
+    }
+    if (filterParts.length > 0) {
+      parts.push(`フィルタ: ${filterParts.join('、')}`)
+    }
+  }
+  
+  if (parts.length === 0) {
+    return '設定なし'
+  }
+  
+  return parts.join('\n')
+}
+
+// ツールチップを表示
+const showTooltip = (template: FilterTemplate) => {
+  hoveredTemplate.value = template
+  tooltipText.value = formatFilterSettings(template)
+}
+
+// ツールチップを非表示
+const hideTooltip = () => {
+  hoveredTemplate.value = null
+  tooltipText.value = ''
+}
 
 // フィルタテンプレートを適用する関数
 const applyFilterTemplate = (template: FilterTemplate) => {
@@ -758,6 +872,10 @@ onMounted(async () => {
   font-weight: 500;
 }
 
+.filter-template-wrapper {
+  position: relative;
+}
+
 .filter-template-button {
   padding: 0.5rem 1rem;
   border: 1px solid var(--current-borderColor);
@@ -777,6 +895,37 @@ onMounted(async () => {
 
   &:active {
     transform: scale(0.98);
+  }
+}
+
+.filter-template-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--current-backgroundLight);
+  color: var(--current-textPrimary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre-line;
+  border: 1px solid var(--current-borderColor);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px var(--current-shadowMd);
+  z-index: 1000;
+  min-width: 200px;
+  max-width: 400px;
+  pointer-events: none;
+
+  &::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-bottom-color: var(--current-backgroundLight);
   }
 }
 
