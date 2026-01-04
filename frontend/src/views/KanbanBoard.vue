@@ -164,6 +164,7 @@
       :projects="myProjects"
       :current-user="currentUser"
       @save="handleTaskUpdate"
+      @delete="handleTaskDelete"
     />
   </div>
 </template>
@@ -374,6 +375,16 @@ const handleTaskUpdate = async (taskData: {
   } catch (e) {
     console.error('Error updating task:', e)
     alert('タスクの更新に失敗しました')
+  }
+}
+
+// タスク削除処理
+const handleTaskDelete = async (taskId: number) => {
+  try {
+    // タスクを再読み込み（削除はTaskEditModal内で実行済み）
+    await loadTasks()
+  } catch (e) {
+    console.error('Error reloading tasks after deletion:', e)
   }
 }
 
