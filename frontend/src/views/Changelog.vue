@@ -54,6 +54,20 @@ interface VersionData {
 
 const versions: VersionData[] = [
   {
+    id: '0.1.1',
+    version: 'β0.1.1',
+    date: '2026年1月4日',
+    categories: [
+      {
+        title: 'フロントエンド機能',
+        items: [
+          '<strong>カンバンボード</strong>:<ul class="nested-list"><li>タスク作成モーダルのプロジェクト選択をオートコンプリート形式に変更（検索機能、キーボードナビゲーション対応）</li></ul>',
+          '<strong>TODOリスト</strong>:<ul class="nested-list"><li>フィルタテンプレートボタンにマウスオーバーで適用するフィルタ設定を表示するツールチップ機能を追加</li><li>フィルタテンプレートに「リセット」ボタンを追加（フィルタ・ソートをすべてリセット）</li></ul>'
+        ]
+      }
+    ]
+  },
+  {
     id: '0.1.0',
     version: 'β0.1.0',
     date: '2026年1月4日',
