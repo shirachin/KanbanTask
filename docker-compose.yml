@@ -1,21 +1,34 @@
+networks:
+  taskapp_network:
+    driver: bridge
+  # 外部のPostgreSQLコンテナと接続する場合、以下のように外部ネットワークを定義
+  # external_db_network:
+  #   external: true
+  #   name: your_external_network_name
+
 services:
   db:
     image: postgres:15-alpine
     container_name: taskapp_db
     environment:
-      POSTGRES_USER: taskapp
-      POSTGRES_PASSWORD: taskapp_password
-      POSTGRES_DB: taskapp_db
+      POSTGRES_USER: ${DB_USER:-taskapp}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-taskapp_password}
+      POSTGRES_DB: ${DB_NAME:-taskapp_db}
       PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
+    # データベースのポートをホスト側に公開する場合のみコメントを外してください
+    # バックエンドコンテナからは db:5432 でアクセス可能（Dockerネットワーク経由）
+    # 外部から直接アクセスする必要がある場合のみ公開してください
+    # ports:
+    #   - "${DB_PORT:-5432}:5432"
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ${DB_DATA_PATH:-./data/postgres}:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U taskapp"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-taskapp} -d ${DB_NAME:-taskapp_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - taskapp_network
 
   backend:
     build:
@@ -27,7 +40,7 @@ services:
         NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,.local}
     container_name: taskapp_backend
     environment:
-      DATABASE_URL: postgresql://taskapp:taskapp_password@db:5432/taskapp_db
+      DATABASE_URL: postgresql://${DB_USER:-taskapp}:${DB_PASSWORD:-taskapp_password}@db:5432/${DB_NAME:-taskapp_db}
       CORS_ORIGINS: http://${DEPLOY_IP}:${FRONTEND_PORT}
     ports:
       - "${BACKEND_PORT}:8000"
@@ -37,6 +50,8 @@ services:
       db:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - taskapp_network
 
   frontend:
     build:
@@ -56,4 +71,6 @@ services:
       - backend
     environment:
       - VITE_API_URL=http://${DEPLOY_IP}:${BACKEND_PORT}
+    networks:
+      - taskapp_network
 

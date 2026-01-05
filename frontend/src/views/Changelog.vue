@@ -29,10 +29,10 @@
             class="changelog-category"
           >
             <h4 class="category-title">{{ category.title }}</h4>
-          <ul class="changelog-list">
+        <ul class="changelog-list">
               <li v-for="(item, index) in category.items" :key="index" v-html="item"></li>
-          </ul>
-          </div>
+        </ul>
+      </div>
         </div>
       </template>
     </div>
@@ -55,6 +55,19 @@ interface VersionData {
 }
 
 const versions: VersionData[] = [
+  {
+    id: '0.1.5',
+    version: 'β0.1.5',
+    date: '2026年1月5日',
+    categories: [
+      {
+        title: 'インフラ・セットアップ',
+        items: [
+          '<strong>Dockerネットワーク</strong>:<ul class="nested-list"><li>専用Dockerネットワーク（taskapp_network）を追加し、他のアプリのPostgreSQLコンテナと同時に動かしてもネットワークレベルで分離されるように変更</li><li>データベースのポートをデフォルトで非公開に変更（Dockerネットワーク経由でアクセス）</li><li>外部PostgreSQLコンテナとの接続方法をドキュメント化</li><li>データベースhealthcheckの修正（データベース名を明示的に指定）</li></ul>'
+        ]
+      }
+    ]
+  },
   {
     id: '0.1.4',
     version: 'β0.1.4',

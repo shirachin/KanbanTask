@@ -62,6 +62,8 @@ NO_PROXY=localhost,127.0.0.1,.local
 - 他のマシンからアクセスする場合は、`DEPLOY_IP`をサーバーのIPアドレスに変更してください
 - ポート番号が既に使用されている場合は、別のポート番号に変更してください
 - プロキシ環境下でライブラリのインストールに失敗する場合は、`HTTP_PROXY`と`HTTPS_PROXY`を設定してください
+- **Dockerネットワークによる分離**: このアプリは独自のDockerネットワーク（`taskapp_network`）を使用するため、他のアプリのPostgreSQLコンテナと同時に動かしてもネットワークレベルで分離されます
+- **データベースのポート公開**: デフォルトではデータベースのポートはホスト側に公開されていません（バックエンドコンテナからは`db:5432`でアクセス可能）。外部から直接アクセスする必要がある場合は、`docker-compose.yml`の`db`サービスの`ports`セクションのコメントを外してください
 
 4. **アプリケーションの起動**
 
@@ -173,14 +175,65 @@ taskapp/
 
 PostgreSQLデータベースは自動的に初期化され、必要なテーブルが作成されます。
 
-データベース接続情報：
-- ホスト: `db` (Docker内部) / `localhost` (外部から)
-- ポート: `5432`
-- データベース名: `taskapp_db`
-- ユーザー名: `taskapp`
-- パスワード: `taskapp_password`
+### Dockerネットワーク経由での接続（推奨）
 
-**注意**: 本番環境では、データベースのパスワードを変更してください。
+バックエンドコンテナからは、Dockerネットワーク経由で`db:5432`にアクセスします。デフォルトでは、データベースのポートはホスト側に公開されていません。
+
+データベース接続情報（コンテナ内から）：
+- ホスト: `db` (Dockerネットワーク内のサービス名)
+- ポート: `5432` (コンテナ内のポート)
+- データベース名: `.env`ファイルの`DB_NAME`で設定（デフォルト: `taskapp_db`）
+- ユーザー名: `.env`ファイルの`DB_USER`で設定（デフォルト: `taskapp`）
+- パスワード: `.env`ファイルの`DB_PASSWORD`で設定（デフォルト: `taskapp_password`）
+
+### 外部から直接アクセスする場合
+
+外部から直接データベースにアクセスする必要がある場合は、`docker-compose.yml`の`db`サービスの`ports`セクションのコメントを外してください：
+
+```yaml
+ports:
+  - "${DB_PORT:-5432}:5432"
+```
+
+その後、以下の情報でアクセスできます：
+- ホスト: `localhost` または `.env`ファイルの`DEPLOY_IP`
+- ポート: `.env`ファイルの`DB_PORT`で設定（デフォルト: `5432`）
+
+### 外部のPostgreSQLコンテナと接続する場合
+
+他のDocker ComposeプロジェクトのPostgreSQLコンテナと接続する場合：
+
+1. 外部ネットワークを作成（または既存のネットワークを使用）：
+```bash
+docker network create shared_db_network
+```
+
+2. `docker-compose.yml`に外部ネットワークを追加：
+```yaml
+networks:
+  taskapp_network:
+    driver: bridge
+  external_db_network:
+    external: true
+    name: shared_db_network
+```
+
+3. `db`サービスと`backend`サービスに外部ネットワークを追加：
+```yaml
+services:
+  db:
+    networks:
+      - taskapp_network
+      - external_db_network
+  backend:
+    networks:
+      - taskapp_network
+      - external_db_network
+```
+
+**注意**: 
+- 本番環境では、データベースのパスワードを変更してください
+- Dockerネットワークにより、他のアプリのPostgreSQLコンテナと同時に動かしてもネットワークレベルで分離されます
 
 ## トラブルシューティング
 
