@@ -105,7 +105,7 @@
       <Help v-else-if="currentView === 'help'" />
     </main>
     <footer class="footer">
-      <span class="version" @click="switchView('changelog')">β0.1.4</span>
+      <span class="version" @click="switchView('changelog')">β0.1.5</span>
       <span class="current-time">{{ currentTime }}</span>
     </footer>
   </div>
