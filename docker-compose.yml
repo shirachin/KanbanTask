@@ -23,7 +23,7 @@ services:
     volumes:
       - ${DB_DATA_PATH:-./data/postgres}:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-taskapp}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-taskapp} -d ${DB_NAME:-taskapp_db}"]
       interval: 10s
       timeout: 5s
       retries: 5

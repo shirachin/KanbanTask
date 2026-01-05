@@ -29,10 +29,10 @@
             class="changelog-category"
           >
             <h4 class="category-title">{{ category.title }}</h4>
-          <ul class="changelog-list">
+        <ul class="changelog-list">
               <li v-for="(item, index) in category.items" :key="index" v-html="item"></li>
-          </ul>
-          </div>
+        </ul>
+      </div>
         </div>
       </template>
     </div>
