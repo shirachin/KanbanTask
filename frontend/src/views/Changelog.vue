@@ -56,6 +56,19 @@ interface VersionData {
 
 const versions: VersionData[] = [
   {
+    id: '0.1.4',
+    version: 'β0.1.4',
+    date: '2026年1月5日',
+    categories: [
+      {
+        title: 'インフラ・セットアップ',
+        items: [
+          '<strong>プロキシ設定</strong>:<ul class="nested-list"><li>環境変数でプロキシ設定を指定可能に変更（.envファイルでHTTP_PROXY、HTTPS_PROXY、NO_PROXYを設定）</li><li>Dockerビルド時のnpm install・pip installでプロキシ経由でライブラリをインストール可能に</li><li>.env.exampleにプロキシ設定のサンプルを追加</li></ul>'
+        ]
+      }
+    ]
+  },
+  {
     id: '0.1.3',
     version: 'β0.1.3',
     date: '2026年1月5日',

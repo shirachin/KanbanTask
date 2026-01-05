@@ -21,6 +21,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,.local}
     container_name: taskapp_backend
     environment:
       DATABASE_URL: postgresql://taskapp:taskapp_password@db:5432/taskapp_db
@@ -38,6 +42,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,.local}
     container_name: taskapp_frontend
     ports:
       - "${FRONTEND_PORT}:5173"

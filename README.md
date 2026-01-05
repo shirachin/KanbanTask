@@ -46,11 +46,22 @@ FRONTEND_PORT=5173
 
 # バックエンドのポート番号
 BACKEND_PORT=8001
+
+# プロキシ設定（プロキシ環境下でライブラリインストールが必要な場合）
+# HTTPプロキシ（例: http://proxy.example.com:8080）
+HTTP_PROXY=
+
+# HTTPSプロキシ（例: http://proxy.example.com:8080）
+HTTPS_PROXY=
+
+# プロキシを経由しないホスト（カンマ区切り、例: localhost,127.0.0.1,.local）
+NO_PROXY=localhost,127.0.0.1,.local
 ```
 
 **注意**: 
 - 他のマシンからアクセスする場合は、`DEPLOY_IP`をサーバーのIPアドレスに変更してください
 - ポート番号が既に使用されている場合は、別のポート番号に変更してください
+- プロキシ環境下でライブラリのインストールに失敗する場合は、`HTTP_PROXY`と`HTTPS_PROXY`を設定してください
 
 4. **アプリケーションの起動**
 
