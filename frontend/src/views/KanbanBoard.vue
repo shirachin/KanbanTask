@@ -174,9 +174,11 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useProjects, type Project } from '../composables/useProjects'
 import { useTasks, type Task } from '../composables/useTasks'
 import { useTodos, type Todo } from '../composables/useTodos'
+import { useStatuses, type Status } from '../composables/useStatuses'
 import TaskCreateModal from '../components/TaskCreateModal.vue'
 import TaskEditModal from '../components/TaskEditModal.vue'
 import { DEFAULT_PERSONAL_STATUSES } from '../constants/statuses'
+import { apiGet } from '../utils/apiClient'
 
 type ProjectMode = 'all' | 'search' | 'personal'
 
@@ -203,6 +205,7 @@ const selectedProjectName = ref<string>('')
 const { projects, loading: projectsLoading, error: projectsError, fetchProjects } = useProjects()
 const { tasks, loading: tasksLoading, error: tasksError, fetchTasks, createTask, updateTask } = useTasks()
 const { fetchTodos, createTodo, deleteTodo, getTodos } = useTodos()
+const { statuses: statusesData, fetchStatuses: fetchStatusesData } = useStatuses()
 
 const showTaskModal = ref(false)
 const showTaskEditModal = ref(false)
@@ -246,8 +249,21 @@ const displayProjectIds = computed(() => {
   }
 })
 
-// ステータス一覧（最初のプロジェクトのステータスを使用、またはデフォルトステータス）
-const statuses = ref<Array<{ id: number; name: string; display_name: string; order: number; color: string; project_id: number }>>([])
+// ステータス一覧（共通ステータスを使用）
+const statuses = computed(() => {
+  if (statusesData.value && statusesData.value.length > 0) {
+    return statusesData.value.sort((a: Status, b: Status) => (a.order || 0) - (b.order || 0))
+  }
+  // フォールバック: デフォルトステータスを使用
+  return DEFAULT_PERSONAL_STATUSES.map(status => ({
+    id: 0,
+    name: status.name,
+    display_name: status.display_name,
+    order: status.order,
+    color: status.color,
+    project_id: null,
+  }))
+})
 
 // プロジェクト検索モード用の利用可能な担当者一覧
 const availableAssignees = ref<string[]>([])
@@ -264,15 +280,15 @@ const fetchAssigneesForProject = async (projectId: number) => {
     }
     
     // プロジェクトのタスクから担当者を追加
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const response = await fetch(`${API_URL}/api/v1/tasks?project_id=${projectId}`)
-    if (response.ok) {
-      const projectTasks = await response.json()
+    try {
+      const projectTasks = await apiGet<Task[]>(`/api/v1/tasks?project_id=${projectId}`)
       projectTasks.forEach((task: Task) => {
         if (task.assignee) {
           assignees.add(task.assignee)
         }
       })
+    } catch (e) {
+      console.error('Error fetching tasks for assignees:', e)
     }
     
     availableAssignees.value = Array.from(assignees).sort()
@@ -352,14 +368,10 @@ const handleTaskUpdate = async (taskData: {
   try {
     // ステータスIDを取得（共通ステータスから取得）
     let statusId: number | null = null
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const statusResponse = await fetch(`${API_URL}/api/v1/statuses`)
-    if (statusResponse.ok) {
-      const statuses = await statusResponse.json()
-      const status = statuses.find((s: any) => s.name === taskData.status)
-      if (status) {
-        statusId = status.id
-      }
+    const statusesList = statusesData.value || []
+    const status = statusesList.find((s: Status) => s.name === taskData.status)
+    if (status) {
+      statusId = status.id
     }
     
     await updateTask(taskData.id, {
@@ -417,31 +429,7 @@ const getTasksByStatus = (statusId: number): Task[] => {
 
 // ステータスを取得（共通ステータスを取得）
 const fetchStatuses = async () => {
-  try {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    // 共通ステータスを取得（project_idパラメータは不要）
-    const response = await fetch(`${API_URL}/api/v1/statuses`)
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    const data = await response.json()
-    if (data && Array.isArray(data) && data.length > 0) {
-      statuses.value = data.sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-    } else {
-      // デフォルトステータスを使用（フォールバック）
-      statuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
-        ...status,
-        project_id: null,
-      }))
-    }
-  } catch (e) {
-    console.error('Error fetching statuses:', e)
-    // デフォルトステータスを使用（フォールバック）
-    statuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
-      ...status,
-      project_id: null,
-    }))
-  }
+  await fetchStatusesData()
 }
 
 // プロジェクトモード変更時の処理
@@ -632,14 +620,10 @@ const handleTaskSave = async (taskData: {
   try {
     // ステータスIDを取得（共通ステータスから取得）
     let statusId: number | null = null
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const statusResponse = await fetch(`${API_URL}/api/v1/statuses`)
-    if (statusResponse.ok) {
-      const statuses = await statusResponse.json()
-      const status = statuses.find((s: any) => s.name === taskData.status)
-      if (status) {
-        statusId = status.id
-      }
+    const statusesList = statusesData.value || []
+    const status = statusesList.find((s: Status) => s.name === taskData.status)
+    if (status) {
+      statusId = status.id
     }
     
     await createTask({

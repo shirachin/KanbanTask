@@ -61,16 +61,21 @@ services:
         HTTP_PROXY: ${HTTP_PROXY:-}
         HTTPS_PROXY: ${HTTPS_PROXY:-}
         NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,.local}
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
     container_name: taskapp_frontend
     ports:
       - "${FRONTEND_PORT}:5173"
     volumes:
       - ./frontend:/app
-      - /app/node_modules
+      # 開発環境ではホスト側のnode_modulesを使用（型チェックのため）
+      # ホスト側と同一権限のユーザーで実行するため、権限問題は発生しません
     depends_on:
       - backend
     environment:
       - VITE_API_URL=http://${DEPLOY_IP}:${BACKEND_PORT}
+      - USER_ID=${USER_ID:-1000}
+      - GROUP_ID=${GROUP_ID:-1000}
     networks:
       - taskapp_network
 

@@ -1,6 +1,7 @@
 """
 Task API routes
 """
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -8,9 +9,11 @@ from sqlalchemy import nullslast
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from app.core.database import get_db
+from app.core.db_utils import db_transaction
 from app.models import Task, Status, Todo
 from app.schemas import TaskCreate, TaskUpdate, TaskResponse, TodoCreate, TodoResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -79,7 +82,11 @@ def get_task(task_id: int, db: Session = Depends(get_db)):
 
 @router.post("", response_model=TaskResponse)
 def create_task(task: TaskCreate, db: Session = Depends(get_db)):
-    """Create a new task"""
+    """
+    Create a new task
+    
+    Creates a new task. For personal tasks (project_id=-1), assignee is required.
+    """
     if task.project_id == -1 and not task.assignee:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Assignee is required for personal tasks")
     
@@ -98,31 +105,27 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
             task_dict["status_id"] = status.id
     
     try:
-        db_task = Task(**task_dict)
-        db.add(db_task)
-        db.commit()
-        db.refresh(db_task)
-        return db_task
-    except IntegrityError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot create task due to database constraints"
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error occurred"
-        )
+        with db_transaction(db):
+            db_task = Task(**task_dict)
+            db.add(db_task)
+            db.commit()
+            db.refresh(db_task)
+            logger.info(f"Task {db_task.id} created successfully")
+            return db_task
+    except HTTPException:
+        raise
     except Exception as e:
-        db.rollback()
+        logger.error(f"Error creating task: {e}", exc_info=True)
         raise
 
 
 @router.put("/{task_id}", response_model=TaskResponse)
 def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get_db)):
-    """Update a task"""
+    """
+    Update a task
+    
+    Updates an existing task by ID.
+    """
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if db_task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task with id {task_id} not found")
@@ -145,54 +148,42 @@ def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get
             update_data["status_id"] = None
     
     try:
-        for field, value in update_data.items():
-            setattr(db_task, field, value)
-        
-        db.commit()
-        db.refresh(db_task)
-        return db_task
-    except IntegrityError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot update task due to database constraints"
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error occurred"
-        )
+        with db_transaction(db):
+            for field, value in update_data.items():
+                setattr(db_task, field, value)
+            
+            db.commit()
+            db.refresh(db_task)
+            logger.info(f"Task {task_id} updated successfully")
+            return db_task
+    except HTTPException:
+        raise
     except Exception as e:
-        db.rollback()
+        logger.error(f"Error updating task {task_id}: {e}", exc_info=True)
         raise
 
 
 @router.delete("/{task_id}")
 def delete_task(task_id: int, db: Session = Depends(get_db)):
-    """Delete a task"""
+    """
+    Delete a task
+    
+    Deletes a task by ID. Related todos are also deleted due to cascade.
+    """
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if db_task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Task with id {task_id} not found")
     
     try:
-        db.delete(db_task)
-        db.commit()
-        return {"message": "Task deleted successfully"}
-    except IntegrityError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete task due to related data constraints"
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error occurred"
-        )
+        with db_transaction(db):
+            db.delete(db_task)
+            db.commit()
+            logger.info(f"Task {task_id} deleted successfully")
+            return {"message": "Task deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
-        db.rollback()
+        logger.error(f"Error deleting task {task_id}: {e}", exc_info=True)
         raise
 
 
@@ -209,7 +200,11 @@ def get_task_todos(task_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{task_id}/todos", response_model=TodoResponse)
 def create_task_todo(task_id: int, todo: TodoCreate, db: Session = Depends(get_db)):
-    """Create a new todo for a task"""
+    """
+    Create a new todo for a task
+    
+    Creates a new todo item associated with the specified task.
+    """
     from datetime import datetime, date
     
     task = db.query(Task).filter(Task.id == task_id).first()
@@ -228,23 +223,15 @@ def create_task_todo(task_id: int, todo: TodoCreate, db: Session = Depends(get_d
             todo_dict["completed_date"] = datetime.combine(todo_dict["completed_date"], datetime.min.time())
     
     try:
-        db_todo = Todo(**todo_dict)
-        db.add(db_todo)
-        db.commit()
-        db.refresh(db_todo)
-        return db_todo
-    except IntegrityError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot create todo due to database constraints"
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error occurred"
-        )
+        with db_transaction(db):
+            db_todo = Todo(**todo_dict)
+            db.add(db_todo)
+            db.commit()
+            db.refresh(db_todo)
+            logger.info(f"Todo {db_todo.id} created for task {task_id}")
+            return db_todo
+    except HTTPException:
+        raise
     except Exception as e:
-        db.rollback()
+        logger.error(f"Error creating todo for task {task_id}: {e}", exc_info=True)
         raise

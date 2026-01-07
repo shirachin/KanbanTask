@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { apiGet, apiPost, apiPut, apiDelete, handleApiError } from '../utils/apiClient'
 
 export type Project = {
   id: number
@@ -11,8 +12,6 @@ export type Project = {
   updated_at?: string | null
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
 export const useProjects = () => {
   const projects = ref<Project[]>([])
   const loading = ref(false)
@@ -23,15 +22,10 @@ export const useProjects = () => {
     loading.value = true
     error.value = null
     try {
-      let url = `${API_URL}/api/v1/projects`
-      if (assignee) {
-        url += `?assignee=${encodeURIComponent(assignee)}`
-      }
-      const response = await fetch(url)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const endpoint = assignee 
+        ? `/api/v1/projects?assignee=${encodeURIComponent(assignee)}`
+        : '/api/v1/projects'
+      const data = await apiGet<any[]>(endpoint)
       // バックエンドの形式（start_month, end_month）からフロントエンドの形式（startMonth, endMonth）に変換
       projects.value = data.map((p: any) => ({
         id: p.id,
@@ -44,7 +38,7 @@ export const useProjects = () => {
         updated_at: p.updated_at,
       }))
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'プロジェクトの取得に失敗しました'
+      error.value = handleApiError(e, 'プロジェクトの取得に失敗しました')
       console.error('Error fetching projects:', e)
     } finally {
       loading.value = false
@@ -56,23 +50,13 @@ export const useProjects = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/projects`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: project.name,
-          start_month: project.startMonth || null,
-          end_month: project.endMonth || null,
-          assignee: project.assignee || [],
-          description: project.description || null,
-        }),
+      const data = await apiPost<any>('/api/v1/projects', {
+        name: project.name,
+        start_month: project.startMonth || null,
+        end_month: project.endMonth || null,
+        assignee: project.assignee || [],
+        description: project.description || null,
       })
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
       // バックエンドの形式からフロントエンドの形式に変換
       const newProject: Project = {
         id: data.id,
@@ -87,7 +71,7 @@ export const useProjects = () => {
       projects.value.push(newProject)
       return newProject
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'プロジェクトの作成に失敗しました'
+      error.value = handleApiError(e, 'プロジェクトの作成に失敗しました')
       console.error('Error creating project:', e)
       throw e
     } finally {
@@ -100,23 +84,13 @@ export const useProjects = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/projects/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: project.name,
-          start_month: project.startMonth !== undefined ? project.startMonth : null,
-          end_month: project.endMonth !== undefined ? project.endMonth : null,
-          assignee: project.assignee || [],
-          description: project.description || null,
-        }),
+      const data = await apiPut<any>(`/api/v1/projects/${id}`, {
+        name: project.name,
+        start_month: project.startMonth !== undefined ? project.startMonth : null,
+        end_month: project.endMonth !== undefined ? project.endMonth : null,
+        assignee: project.assignee || [],
+        description: project.description || null,
       })
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
       // バックエンドの形式からフロントエンドの形式に変換
       const updatedProject: Project = {
         id: data.id,
@@ -134,7 +108,7 @@ export const useProjects = () => {
       }
       return updatedProject
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'プロジェクトの更新に失敗しました'
+      error.value = handleApiError(e, 'プロジェクトの更新に失敗しました')
       console.error('Error updating project:', e)
       throw e
     } finally {
@@ -147,15 +121,10 @@ export const useProjects = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/projects/${id}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
+      await apiDelete(`/api/v1/projects/${id}`)
       projects.value = projects.value.filter((p: Project) => p.id !== id)
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'プロジェクトの削除に失敗しました'
+      error.value = handleApiError(e, 'プロジェクトの削除に失敗しました')
       console.error('Error deleting project:', e)
       throw e
     } finally {

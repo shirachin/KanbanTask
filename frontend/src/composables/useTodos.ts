@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { apiGet, apiPost, apiPut, apiDelete, handleApiError } from '../utils/apiClient'
 
 export type Todo = {
   id: number
@@ -12,7 +13,25 @@ export type Todo = {
   updated_at?: string | null
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+export type TodoListResponse = {
+  items: Array<{
+    id: number
+    task_id: number
+    title: string
+    completed: boolean
+    order: number
+    scheduled_date?: string | null
+    completed_date?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+    task_name?: string | null
+    project_id?: number | null
+    project_name?: string | null
+  }>
+  total: number
+  skip: number
+  limit: number
+}
 
 export const useTodos = () => {
   const todos = ref<Map<number, Todo[]>>(new Map()) // task_id -> todos[]
@@ -24,21 +43,12 @@ export const useTodos = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/tasks/${taskId}/todos`)
-      if (!response.ok) {
-        // 404の場合は空の配列を返す（TODOがまだ存在しない場合）
-        if (response.status === 404) {
-          todos.value.set(taskId, [])
-          return []
-        }
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await apiGet<Todo[]>(`/api/v1/tasks/${taskId}/todos`)
       todos.value.set(taskId, data)
       return data
     } catch (e) {
       // エラーが発生した場合も空の配列を返す（エンドポイントが存在しない場合など）
-      error.value = e instanceof Error ? e.message : 'TODOの取得に失敗しました'
+      error.value = handleApiError(e, 'TODOの取得に失敗しました')
       console.error('Error fetching todos:', e)
       todos.value.set(taskId, [])
       return []
@@ -52,28 +62,18 @@ export const useTodos = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/tasks/${taskId}/todos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          task_id: taskId,
-          title: title,
-          completed: false,
-          order: 0,
-        }),
+      const data = await apiPost<Todo>(`/api/v1/tasks/${taskId}/todos`, {
+        task_id: taskId,
+        title: title,
+        completed: false,
+        order: 0,
       })
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
       const taskTodos = todos.value.get(taskId) || []
       taskTodos.push(data)
       todos.value.set(taskId, taskTodos)
       return data
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'TODOの作成に失敗しました'
+      error.value = handleApiError(e, 'TODOの作成に失敗しました')
       console.error('Error creating todo:', e)
       throw e
     } finally {
@@ -86,17 +86,7 @@ export const useTodos = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/todos/${todoId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(todo),
-      })
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await apiPut<Todo>(`/api/v1/todos/${todoId}`, todo)
       
       // 該当するタスクのTODOリストを更新
       for (const [taskId, taskTodos] of todos.value.entries()) {
@@ -110,7 +100,7 @@ export const useTodos = () => {
       
       return data
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'TODOの更新に失敗しました'
+      error.value = handleApiError(e, 'TODOの更新に失敗しました')
       console.error('Error updating todo:', e)
       throw e
     } finally {
@@ -123,12 +113,7 @@ export const useTodos = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/todos/${todoId}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
+      await apiDelete(`/api/v1/todos/${todoId}`)
       
       // 該当するタスクのTODOリストから削除
       for (const [taskId, taskTodos] of todos.value.entries()) {
@@ -139,7 +124,7 @@ export const useTodos = () => {
         }
       }
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'TODOの削除に失敗しました'
+      error.value = handleApiError(e, 'TODOの削除に失敗しました')
       console.error('Error deleting todo:', e)
       throw e
     } finally {
@@ -157,14 +142,10 @@ export const useTodos = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/todos?skip=${skip}&limit=${limit}`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await apiGet<TodoListResponse>(`/api/v1/todos?skip=${skip}&limit=${limit}`)
       return data
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'TODOの取得に失敗しました'
+      error.value = handleApiError(e, 'TODOの取得に失敗しました')
       console.error('Error fetching all todos:', e)
       throw e
     } finally {

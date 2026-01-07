@@ -150,16 +150,8 @@
 <script setup lang="ts">
 import { ref, watch, computed, reactive } from 'vue'
 import type { Project } from '../composables/useProjects'
+import { useStatuses, type Status } from '../composables/useStatuses'
 import { DEFAULT_PERSONAL_STATUSES } from '../constants/statuses'
-
-type Status = {
-  id: number
-  name: string
-  display_name: string
-  order: number
-  color: string
-  project_id: number
-}
 
 const props = defineProps<{
   show: boolean
@@ -350,19 +342,12 @@ const handleProjectChange = async () => {
     return
   }
   
-  const projectId = parseInt(formData.value.project_id.toString())
   loadingStatuses.value = true
   
   try {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    // 共通ステータスを取得（project_idパラメータは不要）
-    const response = await fetch(`${API_URL}/api/v1/statuses`)
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-    const data = await response.json()
-    if (data.length > 0) {
-      availableStatuses.value = data.sort((a: Status, b: Status) => a.order - b.order)
+    await fetchStatusesData()
+    if (statusesData.value && statusesData.value.length > 0) {
+      availableStatuses.value = statusesData.value.sort((a: Status, b: Status) => (a.order || 0) - (b.order || 0))
       // デフォルトで「未実行」を選択（存在する場合）
       const notStartedStatus = availableStatuses.value.find((s: Status) => s.name === 'not_started')
       if (notStartedStatus) {
@@ -373,7 +358,11 @@ const handleProjectChange = async () => {
     } else {
       // デフォルトステータスを使用（フォールバック）
       availableStatuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
-        ...status,
+        id: 0,
+        name: status.name,
+        display_name: status.display_name,
+        order: status.order,
+        color: status.color,
         project_id: null,
       }))
       formData.value.status = 'not_started' // デフォルトは「未実行」
@@ -382,7 +371,11 @@ const handleProjectChange = async () => {
     console.error('Error fetching statuses:', e)
     // デフォルトステータスを使用（フォールバック）
     availableStatuses.value = DEFAULT_PERSONAL_STATUSES.map(status => ({
-      ...status,
+      id: 0,
+      name: status.name,
+      display_name: status.display_name,
+      order: status.order,
+      color: status.color,
       project_id: null,
     }))
     formData.value.status = 'not_started' // デフォルトは「未実行」

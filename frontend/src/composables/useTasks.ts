@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { apiGet, apiPost, apiPut, apiDelete, handleApiError } from '../utils/apiClient'
 
 export type Task = {
   id: number
@@ -14,8 +15,6 @@ export type Task = {
   updated_at?: string | null
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
 export const useTasks = () => {
   const tasks = ref<Task[]>([])
   const loading = ref(false)
@@ -26,7 +25,6 @@ export const useTasks = () => {
     loading.value = true
     error.value = null
     try {
-      let url = `${API_URL}/api/v1/tasks`
       const params = new URLSearchParams()
       
       if (projectId !== undefined) {
@@ -40,20 +38,13 @@ export const useTasks = () => {
         params.append('assignee', assignee)
       }
       
-      if (params.toString()) {
-        url += `?${params.toString()}`
-      }
+      const queryString = params.toString()
+      const endpoint = `/api/v1/tasks${queryString ? `?${queryString}` : ''}`
       
-      const response = await fetch(url)
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error response:', response.status, errorText)
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await apiGet<Task[]>(endpoint)
       tasks.value = data
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'タスクの取得に失敗しました'
+      error.value = handleApiError(e, 'タスクの取得に失敗しました')
       console.error('Error fetching tasks:', e)
     } finally {
       loading.value = false
@@ -65,21 +56,11 @@ export const useTasks = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/tasks`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(task),
-      })
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await apiPost<Task>('/api/v1/tasks', task)
       tasks.value.push(data)
       return data
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'タスクの作成に失敗しました'
+      error.value = handleApiError(e, 'タスクの作成に失敗しました')
       console.error('Error creating task:', e)
       throw e
     } finally {
@@ -92,24 +73,14 @@ export const useTasks = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/tasks/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(task),
-      })
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      const data = await response.json()
+      const data = await apiPut<Task>(`/api/v1/tasks/${id}`, task)
       const index = tasks.value.findIndex((t: Task) => t.id === id)
       if (index !== -1) {
         tasks.value[index] = data
       }
       return data
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'タスクの更新に失敗しました'
+      error.value = handleApiError(e, 'タスクの更新に失敗しました')
       console.error('Error updating task:', e)
       throw e
     } finally {
@@ -122,15 +93,10 @@ export const useTasks = () => {
     loading.value = true
     error.value = null
     try {
-      const response = await fetch(`${API_URL}/api/v1/tasks/${id}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
+      await apiDelete(`/api/v1/tasks/${id}`)
       tasks.value = tasks.value.filter((t: Task) => t.id !== id)
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'タスクの削除に失敗しました'
+      error.value = handleApiError(e, 'タスクの削除に失敗しました')
       console.error('Error deleting task:', e)
       throw e
     } finally {

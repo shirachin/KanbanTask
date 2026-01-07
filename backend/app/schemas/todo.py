@@ -27,3 +27,27 @@ class TodoResponse(TodoBase):
 
     class Config:
         from_attributes = True
+
+
+class TodoWithTaskInfo(BaseModel):
+    """Todo with task and project information for list view"""
+    id: int
+    task_id: int
+    title: str
+    completed: bool
+    order: int
+    scheduled_date: Optional[str] = None
+    completed_date: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    task_name: Optional[str] = None
+    project_id: Optional[int] = None
+    project_name: Optional[str] = None
+
+
+class TodoListResponse(BaseModel):
+    """Response model for paginated todo list"""
+    items: list[TodoWithTaskInfo]
+    total: int
+    skip: int
+    limit: int

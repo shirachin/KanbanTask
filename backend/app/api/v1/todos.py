@@ -1,62 +1,80 @@
 """
 TODO API routes
 """
+import logging
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from app.core.database import get_db
+from app.core.db_utils import db_transaction
 from app.models import Task, Todo, Project
-from app.schemas import TodoUpdate, TodoResponse
+from app.schemas import TodoUpdate, TodoResponse, TodoListResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", response_model=TodoListResponse)
 def get_all_todos(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
-    """Get all todos with pagination"""
-    query = db.query(Todo).join(Task, Todo.task_id == Task.id).outerjoin(
-        Project, Task.project_id == Project.id
-    )
+    """
+    Get all todos with pagination
     
-    total = query.count()
-    todos = query.order_by(Todo.order).offset(skip).limit(limit).all()
-    
-    result = []
-    for todo in todos:
-        task = todo.task
-        project = task.project if task and task.project_id != -1 else None
-        result.append({
-            "id": todo.id,
-            "task_id": todo.task_id,
-            "title": todo.title,
-            "completed": todo.completed,
-            "order": todo.order,
-            "scheduled_date": todo.scheduled_date.isoformat() if todo.scheduled_date else None,
-            "completed_date": todo.completed_date.isoformat() if todo.completed_date else None,
-            "created_at": todo.created_at.isoformat() if todo.created_at else None,
-            "updated_at": todo.updated_at.isoformat() if todo.updated_at else None,
-            "task_name": task.title if task else None,
-            "project_id": task.project_id if task else None,
-            "project_name": project.name if project else ("個人タスク" if task and task.project_id == -1 else None),
-        })
-    
-    return {
-        "items": result,
-        "total": total,
-        "skip": skip,
-        "limit": limit
-    }
+    Returns a paginated list of todos with task and project information.
+    """
+    try:
+        query = db.query(Todo).join(Task, Todo.task_id == Task.id).outerjoin(
+            Project, Task.project_id == Project.id
+        )
+        
+        total = query.count()
+        todos = query.order_by(Todo.order).offset(skip).limit(limit).all()
+        
+        result = []
+        for todo in todos:
+            task = todo.task
+            project = task.project if task and task.project_id != -1 else None
+            result.append({
+                "id": todo.id,
+                "task_id": todo.task_id,
+                "title": todo.title,
+                "completed": todo.completed,
+                "order": todo.order,
+                "scheduled_date": todo.scheduled_date.isoformat() if todo.scheduled_date else None,
+                "completed_date": todo.completed_date.isoformat() if todo.completed_date else None,
+                "created_at": todo.created_at.isoformat() if todo.created_at else None,
+                "updated_at": todo.updated_at.isoformat() if todo.updated_at else None,
+                "task_name": task.title if task else None,
+                "project_id": task.project_id if task else None,
+                "project_name": project.name if project else ("個人タスク" if task and task.project_id == -1 else None),
+            })
+        
+        return TodoListResponse(
+            items=result,
+            total=total,
+            skip=skip,
+            limit=limit
+        )
+    except Exception as e:
+        logger.error(f"Error fetching todos: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error fetching todos"
+        )
 
 
 @router.put("/{todo_id}", response_model=TodoResponse)
 def update_todo(todo_id: int, todo_update: TodoUpdate, db: Session = Depends(get_db)):
-    """Update a todo"""
+    """
+    Update a todo
+    
+    Updates a todo item. If completed_date is set, completed is automatically set to True.
+    """
     db_todo = db.query(Todo).filter(Todo.id == todo_id).first()
     if db_todo is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Todo with id {todo_id} not found")
@@ -79,52 +97,40 @@ def update_todo(todo_id: int, todo_update: TodoUpdate, db: Session = Depends(get
             update_data["completed"] = False
     
     try:
-        for field, value in update_data.items():
-            setattr(db_todo, field, value)
-        
-        db.commit()
-        db.refresh(db_todo)
-        return db_todo
-    except IntegrityError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot update todo due to database constraints"
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error occurred"
-        )
+        with db_transaction(db):
+            for field, value in update_data.items():
+                setattr(db_todo, field, value)
+            
+            db.commit()
+            db.refresh(db_todo)
+            logger.info(f"Todo {todo_id} updated successfully")
+            return db_todo
+    except HTTPException:
+        raise
     except Exception as e:
-        db.rollback()
+        logger.error(f"Error updating todo {todo_id}: {e}", exc_info=True)
         raise
 
 
 @router.delete("/{todo_id}")
 def delete_todo(todo_id: int, db: Session = Depends(get_db)):
-    """Delete a todo"""
+    """
+    Delete a todo
+    
+    Deletes a todo item by ID.
+    """
     db_todo = db.query(Todo).filter(Todo.id == todo_id).first()
     if db_todo is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Todo with id {todo_id} not found")
     
     try:
-        db.delete(db_todo)
-        db.commit()
-        return {"message": "Todo deleted successfully"}
-    except IntegrityError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete todo due to related data constraints"
-        )
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error occurred"
-        )
+        with db_transaction(db):
+            db.delete(db_todo)
+            db.commit()
+            logger.info(f"Todo {todo_id} deleted successfully")
+            return {"message": "Todo deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
-        db.rollback()
+        logger.error(f"Error deleting todo {todo_id}: {e}", exc_info=True)
         raise

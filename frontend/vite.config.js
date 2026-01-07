@@ -9,6 +9,13 @@ export default defineConfig({
     port: 5173,
     watch: {
       usePolling: true
+    },
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_URL || 'http://backend:8000',
+        changeOrigin: true,
+        rewrite: (path) => path
+      }
     }
   },
   optimizeDeps: {
