@@ -17,17 +17,50 @@ export const useProjects = () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  // プロジェクト一覧を取得
-  const fetchProjects = async (assignee?: string) => {
+  // プロジェクト一覧を取得（ページネーション対応）
+  const fetchProjects = async (
+    assignee?: string,
+    skip: number = 0,
+    limit: number = 100,
+    sortBy?: string,
+    sortOrder: 'asc' | 'desc' = 'desc',
+    filters?: { name?: string; startMonth?: string; endMonth?: string }
+  ) => {
     loading.value = true
     error.value = null
     try {
-      const endpoint = assignee 
-        ? `/api/v1/projects?assignee=${encodeURIComponent(assignee)}`
-        : '/api/v1/projects'
-      const data = await apiGet<any[]>(endpoint)
+      const params = new URLSearchParams()
+      if (assignee) {
+        params.append('assignee', assignee)
+      }
+      if (filters?.name) {
+        params.append('name', filters.name)
+      }
+      if (filters?.startMonth) {
+        params.append('start_month', filters.startMonth)
+      }
+      if (filters?.endMonth) {
+        params.append('end_month', filters.endMonth)
+      }
+      params.append('skip', skip.toString())
+      params.append('limit', limit.toString())
+      if (sortBy) {
+        params.append('sort_by', sortBy)
+      }
+      params.append('sort_order', sortOrder)
+      
+      const endpoint = `/api/v1/projects?${params.toString()}`
+      console.log('fetchProjects: Calling API', endpoint)
+      const data = await apiGet<{ items: any[], total: number, skip: number, limit: number }>(endpoint)
+      console.log('fetchProjects: Received data', data)
+      
+      if (!data || !data.items) {
+        console.error('fetchProjects: Invalid response format', data)
+        throw new Error('Invalid response format from API')
+      }
+      
       // バックエンドの形式（start_month, end_month）からフロントエンドの形式（startMonth, endMonth）に変換
-      projects.value = data.map((p: any) => ({
+      projects.value = data.items.map((p: any) => ({
         id: p.id,
         name: p.name,
         startMonth: p.start_month || '',
@@ -37,11 +70,22 @@ export const useProjects = () => {
         created_at: p.created_at,
         updated_at: p.updated_at,
       }))
+      
+      const result = {
+        items: projects.value,
+        total: data.total,
+        skip: data.skip,
+        limit: data.limit,
+      }
+      console.log('fetchProjects: Returning result', result)
+      return result
     } catch (e) {
       error.value = handleApiError(e, 'プロジェクトの取得に失敗しました')
-      console.error('Error fetching projects:', e)
+      console.error('fetchProjects: Error occurred', e)
+      throw e
     } finally {
       loading.value = false
+      console.log('fetchProjects: Finally block executed, loading:', loading.value)
     }
   }
 

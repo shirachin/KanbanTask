@@ -1,114 +1,123 @@
 <template>
-  <Login v-if="!hasUser" />
-  <div v-else class="app" :class="{ 'nav-collapsed': !navOpen }">
-    <header class="header">
-      <div class="header-content">
-        <button 
-          type="button"
-          class="nav-toggle-button"
-          @click="toggleNav"
-          :aria-label="navOpen ? 'ナビゲーションを閉じる' : 'ナビゲーションを開く'"
-        >
-          <span class="material-symbols-outlined nav-toggle-icon">
-            {{ navOpen ? 'menu_open' : 'menu' }}
-          </span>
-        </button>
-        <div class="header-title">
-          <div class="header-icon" v-html="iconSvg"></div>
-        <h1>タスク管理アプリ</h1>
+  <v-app class="app-no-scroll">
+    <Login v-if="!hasUser" />
+    <div v-else class="layout" :class="{ 'nav-collapsed': !navOpen }">
+      <header class="header">
+        <v-toolbar density="compact" color="primary" flat>
+          <v-btn
+            :icon="navOpen ? 'mdi-menu-open' : 'mdi-menu'"
+            variant="text"
+            @click="toggleNav"
+          />
+          <v-toolbar-title>
+            <div class="d-flex align-center">
+              <div class="header-icon mr-2" v-html="iconSvg"></div>
+              <span>タスク管理アプリ</span>
+            </div>
+          </v-toolbar-title>
+          <v-spacer />
+          <ThemeSelector />
+        </v-toolbar>
+      </header>
+
+      <aside class="nav">
+        <div class="pane">
+          <v-list density="compact" nav>
+            <v-list-item
+              prepend-icon="mdi-view-dashboard"
+              title="ダッシュボード"
+              :active="currentView === 'dashboard'"
+              @click="switchView('dashboard')"
+            />
+            <v-list-item
+              prepend-icon="mdi-view-column"
+              title="カンバンボード"
+              :active="currentView === 'kanban'"
+              @click="switchView('kanban')"
+            />
+            <v-list-item
+              prepend-icon="mdi-format-list-checks"
+              title="TODOリスト"
+              :active="currentView === 'todo'"
+              @click="switchView('todo')"
+            />
+            <v-list-item
+              prepend-icon="mdi-chart-gantt"
+              title="ガントチャート"
+              :active="currentView === 'gantt'"
+              disabled
+              @click="switchView('gantt')"
+            >
+              <template v-slot:append>
+                <v-chip size="x-small" color="grey">未実装</v-chip>
+              </template>
+            </v-list-item>
+            <v-list-item
+              prepend-icon="mdi-folder-multiple"
+              title="プロジェクト管理"
+              :active="currentView === 'project'"
+              @click="switchView('project')"
+            />
+            <v-list-item
+              prepend-icon="mdi-help-circle"
+              title="使い方"
+              :active="currentView === 'help'"
+              @click="switchView('help')"
+            />
+          </v-list>
+
+          <div class="nav-footer">
+            <v-divider />
+            <v-menu location="top">
+              <template v-slot:activator="{ props }">
+                <v-list-item
+                  v-bind="props"
+                  prepend-icon="mdi-account-circle"
+                  :title="currentUser || 'ユーザー'"
+                  class="user-menu-item"
+                />
+              </template>
+              <v-list>
+                <v-list-item
+                  prepend-icon="mdi-logout"
+                  title="ログアウト"
+                  @click="handleLogout"
+                />
+              </v-list>
+            </v-menu>
+          </div>
         </div>
-        <ThemeSelector />
-      </div>
-    </header>
-    <nav class="nav" :class="{ 'nav-collapsed': !navOpen }">
-      <ul class="nav-list">
-        <li>
-          <a 
-            href="#" 
-            class="nav-link" 
-            :class="{ active: currentView === 'dashboard' }"
-            @click.prevent="switchView('dashboard')"
-          >
-            ダッシュボード
-          </a>
-        </li>
-        <li>
-          <a 
-            href="#" 
-            class="nav-link" 
-            :class="{ active: currentView === 'kanban' }"
-            @click.prevent="switchView('kanban')"
-          >
-            カンバンボード
-          </a>
-        </li>
-        <li>
-          <a 
-            href="#" 
-            class="nav-link" 
-            :class="{ active: currentView === 'todo' }"
-            @click.prevent="switchView('todo')"
-          >
-            TODOリスト
-          </a>
-        </li>
-        <li>
-          <a 
-            href="#" 
-            class="nav-link nav-link-disabled" 
-            :class="{ active: currentView === 'gantt' }"
-            @click.prevent="switchView('gantt')"
-          >
-            ガントチャート
-            <span class="nav-badge">未実装</span>
-          </a>
-        </li>
-        <li>
-          <a 
-            href="#" 
-            class="nav-link" 
-            :class="{ active: currentView === 'project' }"
-            @click.prevent="switchView('project')"
-          >
-            プロジェクト管理
-          </a>
-        </li>
-        <li>
-          <a 
-            href="#" 
-            class="nav-link" 
-            :class="{ active: currentView === 'help' }"
-            @click.prevent="switchView('help')"
-          >
-            使い方
-          </a>
-        </li>
-      </ul>
-      <div class="nav-user" @click="toggleUserMenu">
-        <span class="material-symbols-outlined user-icon">account_circle</span>
-        <span class="user-name">{{ currentUser }}</span>
-        <div v-if="showUserMenu" class="user-menu">
-          <button type="button" class="user-menu-item" @click="handleLogout">
-            <span class="material-symbols-outlined user-menu-icon">logout</span>
-            <span class="user-menu-text">ログアウト</span>
-          </button>
+      </aside>
+
+      <main class="main">
+        <div class="pane">
+          <Dashboard v-if="currentView === 'dashboard'" />
+          <KanbanBoard v-else-if="currentView === 'kanban'" />
+          <TodoList v-else-if="currentView === 'todo'" />
+          <GanttChart v-else-if="currentView === 'gantt'" />
+          <ProjectManagement v-else-if="currentView === 'project'" />
+          <Changelog v-else-if="currentView === 'changelog'" />
+          <Help v-else-if="currentView === 'help'" />
         </div>
-      </div>
-    </nav>
-    <main class="main">
-      <Dashboard v-if="currentView === 'dashboard'" />
-      <KanbanBoard v-else-if="currentView === 'kanban'" />
-      <TodoList v-else-if="currentView === 'todo'" />
-      <GanttChart v-else-if="currentView === 'gantt'" />
-      <ProjectManagement v-else-if="currentView === 'project'" />
-      <Changelog v-else-if="currentView === 'changelog'" />
-      <Help v-else-if="currentView === 'help'" />
-    </main>
-    <footer class="footer">
-      <span class="version" @click="switchView('changelog')">β0.1.5</span>
-      <span class="current-time">{{ currentTime }}</span>
-    </footer>
-  </div>
+      </main>
+
+      <footer class="footer">
+        <div class="status">
+          <v-btn
+            variant="text"
+            size="small"
+            density="compact"
+            @click="switchView('changelog')"
+            class="px-2 version-btn"
+          >
+            <span class="beta-char">β</span>0.1.5
+          </v-btn>
+          <v-spacer />
+          <span class="text-caption font-monospace px-2">{{ currentTime }}</span>
+        </div>
+      </footer>
+    </div>
+  </v-app>
 </template>
 
 <script setup lang="ts">
@@ -149,7 +158,6 @@ type ViewType = 'dashboard' | 'kanban' | 'todo' | 'gantt' | 'project' | 'changel
 
 const currentView = ref<ViewType>(getLocalStorage<ViewType>(STORAGE_KEYS.APP_CURRENT_VIEW, 'dashboard'))
 const navOpen = ref(true)
-const showUserMenu = ref(false)
 
 const currentUser = ref<string | null>(getLocalStorage<string | null>(STORAGE_KEYS.APP_CURRENT_USER, null))
 const hasUser = computed(() => currentUser.value !== null)
@@ -179,23 +187,11 @@ const toggleNav = () => {
   navOpen.value = !navOpen.value
 }
 
-const toggleUserMenu = () => {
-  showUserMenu.value = !showUserMenu.value
-}
-
 const handleLogout = () => {
   const url = new URL(window.location.href)
   url.searchParams.delete('user')
   url.searchParams.delete('view')
   window.location.href = url.toString()
-}
-
-// メニュー外をクリックしたら閉じる
-const handleClickOutside = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-  if (!target.closest('.nav-user') && !target.closest('.user-menu')) {
-    showUserMenu.value = false
-  }
 }
 
   onMounted(() => {
@@ -210,9 +206,6 @@ const handleClickOutside = (event: MouseEvent) => {
       currentUser.value = savedUser
       }
 
-    // クリックイベントリスナーを追加
-    document.addEventListener('click', handleClickOutside)
-
     // 現在時刻を更新（初回）
     updateTime()
     // 1秒ごとに現在時刻を更新
@@ -220,7 +213,6 @@ const handleClickOutside = (event: MouseEvent) => {
   })
 
   onUnmounted(() => {
-    document.removeEventListener('click', handleClickOutside)
     if (timeInterval !== null) {
       clearInterval(timeInterval)
     }
@@ -238,333 +230,129 @@ watch(currentView, (newView: ViewType) => {
 </script>
 
 <style lang="scss" scoped>
-@import './styles/_theme';
-
-.app {
-  height: 100vh;
+// VSCode風レイアウト（CSS Grid版）
+.layout {
+  height: 100%;
   width: 100%;
   display: grid;
   grid-template-areas:
     "header header"
-    "nav main"
+    "nav    main"
     "footer footer";
   grid-template-columns: 200px 1fr;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr 22px;
+  overflow: hidden; /* 全体はスクロールさせない */
   transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
+  position: relative;
 }
 
-.app.nav-collapsed {
+.layout.nav-collapsed {
   grid-template-columns: 0 1fr;
 }
 
+/* エリア割当 */
 .header {
   grid-area: header;
-  position: sticky;
-  top: 0;
+  overflow: hidden;
   z-index: 100;
-  background: var(--current-headerBackground);
-  color: var(--current-textWhite);
-  padding: 0.75rem 1.5rem;
-  box-shadow: 0 2px 4px var(--current-shadowSm);
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-
-  .nav-toggle-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem;
-    border: 1px solid var(--current-buttonBorderColor);
-    border-radius: 6px;
-    background: var(--current-buttonBackground);
-    color: var(--current-textWhite);
-    cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s, transform 0.1s;
-
-    &:hover {
-      background: var(--current-buttonHoverBackground);
-      border-color: var(--current-buttonHoverBorderColor);
-    }
-
-    &:active {
-      transform: scale(0.95);
-    }
-
-    &:focus {
-      outline: none;
-      border-color: var(--current-buttonFocusBorderColor);
-      background: var(--current-buttonFocusBackground);
-    }
-
-    .nav-toggle-icon {
-      font-variation-settings:
-        'FILL' 0,
-        'wght' 400,
-        'GRAD' 0,
-        'opsz' 24;
-      font-size: 1.5rem;
-      color: var(--current-textWhite);
-      opacity: 0.9;
-    }
-  }
-
-  .header-title {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex: 1;
-  }
-
-  .header-icon {
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    // SVGの色をテーマカラーに合わせる
-    color: var(--current-textWhite);
-    transition: color 0.3s ease;
-    
-    :deep(svg) {
-      width: 100%;
-      height: 100%;
-    }
-    
-    :deep(.st0) {
-      fill: currentColor;
-    }
-  }
-
-  h1 {
-    margin: 0;
-    font-size: 1.8rem;
-    font-weight: 600;
+  background-color: var(--current-headerBackground);
+  
+  :deep(.v-toolbar) {
+    background-color: var(--current-headerBackground) !important;
   }
 }
 
 .nav {
   grid-area: nav;
-  background: var(--current-navBackground);
-  border-right: 1px solid var(--current-borderColor);
-  padding: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  width: 200px;
-  min-width: 200px;
-  height: 100%;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translateX(0);
-  display: flex;
-  flex-direction: column;
-  position: relative;
-
-  &.nav-collapsed {
-    transform: translateX(-100%);
-  }
-}
-
-.nav-list {
-  list-style: none;
-  padding: 1rem 0;
-  margin: 0;
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.nav-link {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.5rem;
-  color: var(--current-textPrimary);
-  text-decoration: none;
-  transition: background-color 0.2s;
-
-  &:hover {
-    background-color: var(--current-hoverBackground);
-  }
-
-  &:active,
-  &.active {
-    background-color: var(--current-activeBackground);
-    color: var(--current-textWhite);
-  }
-
-  &.nav-link-disabled {
-    opacity: 0.7;
-    cursor: default;
-  }
-}
-
-.nav-badge {
-  display: inline-block;
-  padding: 0.125rem 0.5rem;
-  background: var(--current-backgroundGrayLight);
-  color: var(--current-textSecondary);
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  margin-left: 0.5rem;
-}
-
-.nav-user {
-  padding: 1rem 1.5rem;
-  border-top: 1px solid var(--current-borderColor);
-  background: var(--current-navBackground);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  position: relative;
-
-  &:hover {
-    background-color: var(--current-hoverBackground);
-  }
-
-  .user-icon {
-    font-variation-settings:
-      'FILL' 0,
-      'wght' 400,
-      'GRAD' 0,
-      'opsz' 24;
-    font-size: 1.5rem;
-    color: var(--current-textPrimary);
-    flex-shrink: 0;
-  }
-
-  .user-name {
-    color: var(--current-textPrimary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    flex: 1;
-    padding: 0.5rem 0.75rem;
-    background: var(--current-backgroundGrayLight);
-    border-radius: 6px;
-    text-align: center;
-    word-break: break-word;
-  }
-}
-
-.user-menu {
-  position: absolute;
-  bottom: calc(100% + 0.5rem);
-  left: 0;
-  right: 0;
-  background: var(--current-backgroundLight);
-  border: 1px solid var(--current-borderColor);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px var(--current-shadowLg);
-  padding: 0.5rem;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.user-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--current-textPrimary);
-  cursor: pointer;
-  transition: background-color 0.2s;
-  text-align: left;
-  width: 100%;
-
-  &:hover {
-    background: var(--current-hoverBackground);
-  }
-
-  .user-menu-icon {
-    font-variation-settings:
-      'FILL' 0,
-      'wght' 400,
-      'GRAD' 0,
-      'opsz' 24;
-    font-size: 1.25rem;
-    color: var(--current-textPrimary);
-    flex-shrink: 0;
-  }
-
-  .user-menu-text {
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
 }
 
 .main {
   grid-area: main;
-  padding: 2rem;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
+  position: relative;
   height: 100%;
-  background: var(--current-mainBackground);
 }
 
 .footer {
   grid-area: footer;
-  background: var(--current-footerBackground);
-  border-top: 1px solid var(--current-borderColor);
-  padding: 0;
+  overflow: hidden;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+/* nav/main だけスクロール */
+.pane {
+  height: 100%;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: var(--current-textSecondary);
-  font-size: 0.875rem;
-  height: 22px;
-  line-height: 22px;
+  flex-direction: column;
+}
 
-  .version {
-    font-size: 0.875rem;
-    color: var(--current-textSecondary);
-    cursor: pointer;
-    padding: 0 1rem;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    transition: background-color 0.15s, color 0.15s;
-    user-select: none;
-
-    &:hover {
-      background-color: var(--current-backgroundGrayMedium);
-      color: var(--current-textPrimary);
-    }
-
-    &:active {
-      background-color: var(--current-backgroundGrayDark);
-    }
-  }
-
-  .current-time {
-    font-size: 0.875rem;
-    font-family: 'Courier New', monospace;
-    opacity: 0.8;
-    padding: 0 1rem;
-    height: 100%;
-    display: flex;
-    align-items: center;
+.nav .pane {
+  // ナビゲーションのフッターを下部に固定
+  .nav-footer {
+    margin-top: auto;
   }
 }
 
-.placeholder {
+.main .pane {
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+/* status bar っぽく */
+.status {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.version-btn {
+  min-width: auto !important;
+  font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.beta-char {
+  font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  font-feature-settings: normal;
+  font-variant: normal;
+  unicode-bidi: normal;
+}
+
+.header-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
-  color: var(--current-textSecondary);
-  font-size: 1.2rem;
+  color: inherit;
+  
+  :deep(svg) {
+    width: 100%;
+    height: 100%;
+  }
+  
+  :deep(.st0) {
+    fill: currentColor;
+  }
+}
+
+.user-menu-item {
+  cursor: pointer;
+}
+
+// v-appがスクロールしないように
+.app-no-scroll {
+  overflow: hidden !important;
+  height: 100% !important;
 }
 </style>

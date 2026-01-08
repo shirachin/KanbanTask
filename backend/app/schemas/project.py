@@ -26,3 +26,11 @@ class ProjectResponse(ProjectBase):
 
     class Config:
         from_attributes = True
+
+
+class ProjectListResponse(BaseModel):
+    """Response model for paginated project list"""
+    items: List[ProjectResponse]
+    total: int
+    skip: int
+    limit: int

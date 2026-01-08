@@ -137,12 +137,39 @@ export const useTodos = () => {
     return todos.value.get(taskId) || []
   }
 
-  // すべてのTODOを取得（ページネーション対応）
-  const fetchAllTodos = async (skip: number = 0, limit: number = 100) => {
+  // すべてのTODOを取得（ページネーション、ソート、フィルタ対応）
+  const fetchAllTodos = async (
+    skip: number = 0,
+    limit: number = 100,
+    sortBy?: string,
+    sortOrder: 'asc' | 'desc' = 'asc',
+    filters?: { title?: string; completed?: boolean; taskName?: string; projectName?: string }
+  ) => {
     loading.value = true
     error.value = null
     try {
-      const data = await apiGet<TodoListResponse>(`/api/v1/todos?skip=${skip}&limit=${limit}`)
+      const params = new URLSearchParams()
+      params.append('skip', skip.toString())
+      params.append('limit', limit.toString())
+      if (sortBy) {
+        params.append('sort_by', sortBy)
+      }
+      params.append('sort_order', sortOrder)
+      if (filters?.title) {
+        params.append('title', filters.title)
+      }
+      if (filters?.completed !== undefined) {
+        params.append('completed', filters.completed.toString())
+      }
+      if (filters?.taskName) {
+        params.append('task_name', filters.taskName)
+      }
+      if (filters?.projectName) {
+        params.append('project_name', filters.projectName)
+      }
+      
+      const endpoint = `/api/v1/todos?${params.toString()}`
+      const data = await apiGet<TodoListResponse>(endpoint)
       return data
     } catch (e) {
       error.value = handleApiError(e, 'TODOの取得に失敗しました')

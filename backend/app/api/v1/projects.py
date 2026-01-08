@@ -11,34 +11,102 @@ from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from app.core.database import get_db
 from app.core.db_utils import db_transaction
 from app.models import Project, Status
-from app.schemas import ProjectCreate, ProjectUpdate, ProjectResponse
+from app.schemas import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse
 from app.core.constants import DEFAULT_STATUS_DEFINITIONS
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("", response_model=List[ProjectResponse])
-def get_projects(assignee: Optional[str] = None, db: Session = Depends(get_db)):
-    """Get all projects"""
-    query = db.query(Project)
+@router.get("", response_model=ProjectListResponse)
+def get_projects(
+    assignee: Optional[str] = None,
+    name: Optional[str] = None,
+    start_month: Optional[str] = None,
+    end_month: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    sort_by: Optional[str] = None,
+    sort_order: Optional[str] = "desc",
+    db: Session = Depends(get_db)
+):
+    """
+    Get projects with pagination, sorting, and filtering
     
-    if assignee:
-        query = query.filter(Project.assignee.like(f'%"{assignee}"%'))
-    
-    projects = query.order_by(Project.created_at.desc()).all()
-    
-    # assigneeをリストに変換
-    for project in projects:
-        if project.assignee:
-            try:
-                project.assignee = json.loads(project.assignee)
-            except:
-                project.assignee = []
+    - **skip**: Number of records to skip (for pagination)
+    - **limit**: Maximum number of records to return
+    - **sort_by**: Column to sort by (default: created_at)
+    - **sort_order**: Sort order (asc or desc, default: desc)
+    - **assignee**: Filter by assignee name
+    - **name**: Filter by project name (partial match)
+    - **start_month**: Filter by start month (exact match)
+    - **end_month**: Filter by end month (exact match)
+    """
+    try:
+        query = db.query(Project)
+        
+        # システム用プロジェクト（id=-1）を除外
+        query = query.filter(Project.id != -1)
+        
+        # フィルタリング
+        if assignee:
+            query = query.filter(Project.assignee.like(f'%"{assignee}"%'))
+        if name:
+            query = query.filter(Project.name.ilike(f'%{name}%'))
+        if start_month:
+            query = query.filter(Project.start_month == start_month)
+        if end_month:
+            query = query.filter(Project.end_month == end_month)
+        
+        # ソート
+        sort_column = Project.created_at  # デフォルト
+        if sort_by:
+            if sort_by == "id":
+                sort_column = Project.id
+            elif sort_by == "name":
+                sort_column = Project.name
+            elif sort_by == "start_month":
+                sort_column = Project.start_month
+            elif sort_by == "end_month":
+                sort_column = Project.end_month
+            elif sort_by == "created_at":
+                sort_column = Project.created_at
+            elif sort_by == "updated_at":
+                sort_column = Project.updated_at
+        
+        if sort_order == "asc":
+            query = query.order_by(sort_column.asc())
         else:
-            project.assignee = []
-    
-    return projects
+            query = query.order_by(sort_column.desc())
+        
+        # 総件数を取得
+        total = query.count()
+        
+        # ページネーション
+        projects = query.offset(skip).limit(limit).all()
+        
+        # assigneeをリストに変換
+        for project in projects:
+            if project.assignee:
+                try:
+                    project.assignee = json.loads(project.assignee)
+                except:
+                    project.assignee = []
+            else:
+                project.assignee = []
+        
+        return ProjectListResponse(
+            items=projects,
+            total=total,
+            skip=skip,
+            limit=limit
+        )
+    except Exception as e:
+        logger.error(f"Error fetching projects: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error fetching projects"
+        )
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)

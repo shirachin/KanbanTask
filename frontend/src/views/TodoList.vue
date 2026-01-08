@@ -28,82 +28,34 @@
     </div>
     
     <div class="todo-content">
-      <div v-if="error" class="error-message">
-        {{ error }}
-      </div>
-      <div class="todo-section">
-        <div v-if="loading && todoListData.length === 0" class="loading-message">
-          読み込み中...
-        </div>
-        <AgGridVue
-          v-else
-          ref="gridRef"
-          :rowData="todoListData"
-          :columnDefs="columnDefs"
-          :defaultColDef="defaultColDef"
-          :context="gridContext"
-          :pagination="true"
-          :paginationPageSize="paginationPageSize"
-          :paginationPageSizeSelector="[25, 50, 100, 200]"
-          @columnStateChanged="onColumnStateChanged"
-          @filterChanged="onFilterChanged"
-          @paginationChanged="onPaginationChanged"
-          @sortChanged="onSortChanged"
-          @firstDataRendered="onFirstDataRendered"
-          @gridReady="onGridReady"
-          class="ag-theme-quartz"
-          style="height: 600px; width: 100%;"
-        />
-      </div>
+      <AgGridVue
+        ref="gridRef"
+        :rowModelType="'infinite'"
+        :columnDefs="columnDefs"
+        :defaultColDef="defaultColDef"
+        :cacheBlockSize="25"
+        :maxBlocksInCache="10"
+        @gridReady="onGridReady"
+        class="ag-theme-quartz todo-grid"
+        style="width: 100%; height: 100%;"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, defineComponent, h, nextTick } from 'vue'
+import { ref, defineComponent, h, nextTick } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
-import type { ICellRendererParams, ColumnState, FilterModel } from 'ag-grid-community'
-import { useTodos, type Todo } from '../composables/useTodos'
-import { useTasks, type Task } from '../composables/useTasks'
-import { useProjects, type Project } from '../composables/useProjects'
+import type { ICellRendererParams, IDatasource, IGetRowsParams, IFilterComp, IFilterParams, FilterModel } from 'ag-grid-community'
+import { useTodos } from '../composables/useTodos'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
-// LocalStorage管理
-import { getLocalStorage, setLocalStorage, STORAGE_KEYS } from '../composables/useLocalStorage'
-
-// Composables
-const { todos, loading, error, fetchTodos, fetchAllTodos, updateTodo, getTodos } = useTodos()
-const { tasks, fetchTasks } = useTasks()
-const { projects, fetchProjects } = useProjects()
+// API composableを使用
+const { fetchAllTodos, updateTodo } = useTodos()
 
 // AG Gridの参照
 const gridRef = ref<InstanceType<typeof AgGridVue> | null>(null)
-
-// ページネーションサイズ
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, MAX_RETRY_COUNT, RESTORE_STATE_TIMEOUTS } from '../constants/grid'
-
-const savedPageSize = getLocalStorage<number>(STORAGE_KEYS.TODO_LIST_PAGE_SIZE, DEFAULT_PAGE_SIZE)
-const paginationPageSize = ref<number>(PAGE_SIZE_OPTIONS.includes(savedPageSize as typeof PAGE_SIZE_OPTIONS[number]) ? savedPageSize : DEFAULT_PAGE_SIZE)
-
-// 初期化フラグ（初期化時のイベントを無視するため）
-const isInitializing = ref(true)
-
-// カラム状態（ソート、表示/非表示、幅など）
-const savedColumnState = getLocalStorage<ColumnState[]>(STORAGE_KEYS.TODO_LIST_COLUMN_STATE, [])
-const columnState = ref<ColumnState[]>(savedColumnState)
-
-// ソートモデル（ソート状態を保存するため）
-interface SortModel {
-  colId: string
-  sort: 'asc' | 'desc'
-}
-const savedSortModel = getLocalStorage<SortModel[]>(STORAGE_KEYS.TODO_LIST_SORT_MODEL, [])
-const sortModel = ref<SortModel[]>(savedSortModel)
-
-// フィルタモデル
-const savedFilterModel = getLocalStorage<FilterModel>(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, {})
-const filterModel = ref<FilterModel>(savedFilterModel)
 
 // フィルタテンプレートの定義
 interface FilterTemplate {
@@ -111,6 +63,7 @@ interface FilterTemplate {
   name: string
   sortModel: Array<{ colId: string; sort: 'asc' | 'desc' }>
   filterModel?: FilterModel
+  tooltip: string[] // 複数行対応のため配列に変更
 }
 
 const filterTemplates: FilterTemplate[] = [
@@ -121,114 +74,60 @@ const filterTemplates: FilterTemplate[] = [
       { colId: 'completed', sort: 'asc' },
       { colId: 'scheduled_date', sort: 'asc' },
     ],
+    tooltip: [
+      'ソート:',
+      '1. 完了（昇順）',
+      '2. 予定日（昇順）',
+    ],
+  },
+  {
+    id: 'incomplete',
+    name: '未完了',
+    sortModel: [
+      { colId: 'scheduled_date', sort: 'asc' },
+    ],
+    filterModel: {
+      completed: {
+        value: false,
+        filterType: 'custom',
+      },
+    },
+    tooltip: [
+      'フィルタ:',
+      '- 完了 = 未完了',
+      'ソート:',
+      '1. 予定日（昇順）',
+    ],
   },
   {
     id: 'reset',
     name: 'リセット',
     sortModel: [],
     filterModel: {},
+    tooltip: [
+      'フィルタ・ソートをすべてリセットします',
+    ],
   },
 ]
 
 // カラム名のマッピング（colId -> headerName）
-const columnNameMap: Record<string, string> = {
+const columnNameMapForDisplay: Record<string, string> = {
   'completed': '完了',
-  'title': 'TODO',
-  'task_name': 'タスク名',
-  'project_name': 'プロジェクト名',
-  'scheduled_date': '実行予定日',
-  'completed_date': '実行完了日',
+  'title': 'タイトル',
+  'task_name': 'タスク',
+  'project_name': 'プロジェクト',
+  'scheduled_date': '予定日',
+  'completed_date': '完了日',
 }
 
 // ツールチップ表示用の状態
 const hoveredTemplate = ref<FilterTemplate | null>(null)
 const tooltipText = ref<string>('')
 
-// フィルタ設定を人間が読める形式に変換
-const formatFilterSettings = (template: FilterTemplate): string => {
-  // リセットテンプレートの場合は特別なメッセージを返す
-  if (template.id === 'reset') {
-    return 'フィルタ・ソートをすべてリセットします'
-  }
-  
-  const parts: string[] = []
-  
-  // ソート設定
-  if (template.sortModel && template.sortModel.length > 0) {
-    const sortParts = template.sortModel.map((sort, index) => {
-      const columnName = columnNameMap[sort.colId] || sort.colId
-      const sortDirection = sort.sort === 'asc' ? '昇順' : '降順'
-      return index === 0 
-        ? `${columnName}（${sortDirection}）`
-        : ` → ${columnName}（${sortDirection}）`
-    })
-    parts.push(`ソート: ${sortParts.join('')}`)
-  }
-  
-  // フィルタ設定
-  if (template.filterModel && Object.keys(template.filterModel).length > 0) {
-    const filterParts: string[] = []
-    for (const [colId, filter] of Object.entries(template.filterModel)) {
-      const columnName = columnNameMap[colId] || colId
-      const filterType = (filter as any).filterType || 'text'
-      
-      if (filterType === 'set') {
-        // Setフィルタ（複数選択）
-        const values = (filter as any).values || []
-        if (values.length > 0) {
-          filterParts.push(`${columnName}: ${values.join(', ')}`)
-        }
-      } else if (filterType === 'text') {
-        // テキストフィルタ
-        const type = (filter as any).type || 'contains'
-        const filterText = (filter as any).filter || ''
-        if (filterText) {
-          const typeMap: Record<string, string> = {
-            'contains': 'を含む',
-            'equals': 'と等しい',
-            'notEqual': 'と等しくない',
-            'startsWith': 'で始まる',
-            'endsWith': 'で終わる',
-          }
-          filterParts.push(`${columnName}: "${filterText}"${typeMap[type] || ''}`)
-        }
-      } else if (filterType === 'date') {
-        // 日付フィルタ
-        const type = (filter as any).type || 'equals'
-        const dateFrom = (filter as any).dateFrom
-        const dateTo = (filter as any).dateTo
-        const typeMap: Record<string, string> = {
-          'equals': 'と等しい',
-          'notEqual': 'と等しくない',
-          'lessThan': 'より前',
-          'greaterThan': 'より後',
-          'inRange': 'の範囲内',
-        }
-        if (dateFrom && dateTo) {
-          filterParts.push(`${columnName}: ${dateFrom} ～ ${dateTo}`)
-        } else if (dateFrom) {
-          filterParts.push(`${columnName}: ${dateFrom}${typeMap[type] || ''}`)
-        } else if (dateTo) {
-          filterParts.push(`${columnName}: ${dateTo}${typeMap[type] || ''}`)
-        }
-      }
-    }
-    if (filterParts.length > 0) {
-      parts.push(`フィルタ: ${filterParts.join('、')}`)
-    }
-  }
-  
-  if (parts.length === 0) {
-    return '設定なし'
-  }
-  
-  return parts.join('\n')
-}
-
 // ツールチップを表示
 const showTooltip = (template: FilterTemplate) => {
   hoveredTemplate.value = template
-  tooltipText.value = formatFilterSettings(template)
+  tooltipText.value = template.tooltip.join('\n')
 }
 
 // ツールチップを非表示
@@ -237,244 +136,269 @@ const hideTooltip = () => {
   tooltipText.value = ''
 }
 
-// フィルタテンプレートを適用する関数
+// フィルタテンプレートを適用する関数（Infinite Scroll対応）
+// AG GridのSorting APIとFilter APIを使用
+// https://www.ag-grid.com/vue-data-grid/row-sorting/#sorting-api
+// https://www.ag-grid.com/vue-data-grid/filter-api/
 const applyFilterTemplate = async (template: FilterTemplate) => {
-  if (!gridRef.value?.api) return
-  
-  // 一時的にisInitializingをfalseにして、AG GridのAPIが正しく動作するようにする
-  const wasInitializing = isInitializing.value
-  isInitializing.value = false
+  if (!gridRef.value?.api) {
+    console.error('Grid API not available')
+    return
+  }
   
   try {
-    // Vueの更新サイクルを待つ
-    await nextTick()
+    console.log('Applying filter template:', template)
     
-    // フィルタを先にクリア/適用（フィルタが先に適用されると、ソートが正しく動作する）
-    if (template.filterModel && Object.keys(template.filterModel).length > 0) {
-      if (typeof gridRef.value.api.setFilterModel === 'function') {
-        gridRef.value.api.setFilterModel(template.filterModel)
-      }
-      
-      // LocalStorageに保存（テンプレート適用時も確実に保存）
-      filterModel.value = template.filterModel
-      setLocalStorage(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, template.filterModel)
-    } else {
-      // フィルタをクリア（nullを使用して完全にクリア）
-      if (typeof gridRef.value.api.setFilterModel === 'function') {
-        gridRef.value.api.setFilterModel(null)
-      }
-      
-      // LocalStorageにも保存
-      filterModel.value = {}
-      setLocalStorage(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, null)
-    }
+    // ソートモデルとフィルタモデルを準備
+    const sortModel = template.sortModel && template.sortModel.length > 0 
+      ? template.sortModel 
+      : []
+    const filterModel = template.filterModel && Object.keys(template.filterModel).length > 0
+      ? template.filterModel
+      : {}
     
-    // ソートモデルを適用
-    if (template.sortModel && template.sortModel.length > 0) {
-      const sortColumnState = template.sortModel.map((sort, index) => ({
+    console.log('Setting sort model:', sortModel)
+    console.log('Setting filter model:', filterModel)
+    
+    // AG GridのapplyColumnStateを使用してソートを設定
+    // https://www.ag-grid.com/vue-data-grid/row-sorting/#sorting-api
+    // この方法により、Infinite Scrollモデルでも確実にソートが反映される
+    if (sortModel.length > 0) {
+      const columnState = sortModel.map((sort, index) => ({
         colId: sort.colId,
         sort: sort.sort,
         sortIndex: index,
       }))
       
+      console.log('Applying column state for sort:', columnState)
       if (typeof gridRef.value.api.applyColumnState === 'function') {
-        gridRef.value.api.applyColumnState({ 
-          state: sortColumnState,
+        gridRef.value.api.applyColumnState({
+          state: columnState,
           defaultState: { sort: null },
-          applyOrder: false
         })
+      } else if (typeof gridRef.value.api.setSortModel === 'function') {
+        gridRef.value.api.setSortModel(sortModel)
       }
-      
-      // LocalStorageに保存（テンプレート適用時も確実に保存）
-      sortModel.value = template.sortModel
-      setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, template.sortModel)
     } else {
-      // ソートをクリア（defaultState: { sort: null }を使用）
+      // ソートをクリア
+      console.log('Clearing sort')
       if (typeof gridRef.value.api.applyColumnState === 'function') {
-        gridRef.value.api.applyColumnState({ 
-          state: [],
-          defaultState: { sort: null }
+        gridRef.value.api.applyColumnState({
+          defaultState: { sort: null },
         })
-      } else if (typeof gridRef.value.api.clearAllSorts === 'function') {
-        gridRef.value.api.clearAllSorts()
+      } else if (typeof gridRef.value.api.setSortModel === 'function') {
+        gridRef.value.api.setSortModel([])
       }
-      
-      sortModel.value = []
-      setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, null)
     }
     
-    // クライアントサイドの行モデルを更新して変更を反映
-    if (typeof gridRef.value.api.refreshClientSideRowModel === 'function') {
-      gridRef.value.api.refreshClientSideRowModel('filter')
+    // フィルタを設定
+    if (typeof gridRef.value.api.setFilterModel === 'function') {
+      gridRef.value.api.setFilterModel(filterModel)
     }
     
-    // AG Gridのイベントを手動で発火（isInitializingがfalseなので、イベントハンドラーが動作する）
-    if (typeof gridRef.value.api.onFilterChanged === 'function') {
-      gridRef.value.api.onFilterChanged()
-    }
-    if (typeof gridRef.value.api.onSortChanged === 'function') {
-      gridRef.value.api.onSortChanged()
-    }
-    
-    // AG Gridを強制的に再描画（force: trueで強制更新）
+    // Vueの更新サイクルを待つ
     await nextTick()
-    if (typeof gridRef.value.api.refreshCells === 'function') {
-      gridRef.value.api.refreshCells({ force: true })
+    
+    // Infinite Scrollモデルでは、refreshInfiniteCache()を呼び出すことで、
+    // ソートとフィルタの状態が反映される
+    console.log('Refreshing infinite cache')
+    if (typeof gridRef.value.api.refreshInfiniteCache === 'function') {
+      gridRef.value.api.refreshInfiniteCache()
     }
     
   } catch (e) {
     console.error('Error applying filter template:', e)
-  } finally {
-    // 元のisInitializingの状態に戻す
-    isInitializing.value = wasInitializing
   }
 }
 
-// カラム状態変更時の処理
-const onColumnStateChanged = () => {
-  if (!gridRef.value?.api || isInitializing.value) return
-  
-  const state = gridRef.value.api.getColumnState()
-  // ソートや幅の変更のみを保存（hideなどの不要な情報は除外）
-  const relevantState = state.map((col: any) => ({
-    colId: col.colId,
-    sort: col.sort,
-    sortIndex: col.sortIndex,
-    width: col.width,
-    hide: col.hide,
-  }))
-  
-  columnState.value = relevantState
-  setLocalStorage(STORAGE_KEYS.TODO_LIST_COLUMN_STATE, relevantState.length > 0 ? relevantState : null)
-  
-  // ソートモデルも別途保存（getColumnStateからソート情報を取得）
-  const columnState = gridRef.value.api.getColumnState()
-  const sortFromState = columnState
-    .filter((col: any) => col.sort)
-    .sort((a: any, b: any) => (a.sortIndex || 0) - (b.sortIndex || 0))
-    .map((col: any) => ({ colId: col.colId, sort: col.sort }))
-  
-  if (sortFromState.length > 0) {
-    sortModel.value = sortFromState
-    setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, sortFromState)
-  } else {
-    sortModel.value = []
-    setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, null)
+// カラム名のマッピング（フロントエンド → バックエンド）
+const columnNameMap: Record<string, string> = {
+  'id': 'id',
+  'title': 'title',
+  'completed': 'completed',
+  'order': 'order',
+  'scheduled_date': 'scheduled_date',
+  'completed_date': 'completed_date',
+  'created_at': 'created_at',
+  'updated_at': 'updated_at',
+  'task_name': 'task_name',
+  'project_name': 'project_name',
+}
+
+// Infinite Scroll用のdatasource（ソート・フィルタ対応）
+const createDatasource = (): IDatasource => {
+  return {
+    getRows: async (params: IGetRowsParams) => {
+      console.log('getRows', { startRow: params.startRow, endRow: params.endRow, sortModel: params.sortModel, filterModel: params.filterModel })
+      
+      try {
+        // ソート情報を取得
+        let sortBy: string | undefined = undefined
+        let sortOrder: 'asc' | 'desc' = 'asc'
+        
+        if (params.sortModel && params.sortModel.length > 0) {
+          const firstSort = params.sortModel[0]
+          sortBy = columnNameMap[firstSort.colId] || firstSort.colId
+          sortOrder = firstSort.sort
+          console.log('getRows: Using sort', { colId: firstSort.colId, sortBy, sortOrder })
+        } else {
+          // デフォルトのソート（order asc）
+          sortBy = 'order'
+          sortOrder = 'asc'
+        }
+        
+        // フィルタ情報を取得
+        const filters: { title?: string; completed?: boolean; taskName?: string; projectName?: string } = {}
+        if (params.filterModel) {
+          // titleフィルタ
+          if (params.filterModel.title) {
+            const titleFilter = params.filterModel.title
+            if (titleFilter.filterType === 'text' && titleFilter.type === 'contains') {
+              filters.title = titleFilter.filter
+            }
+          }
+          // completedフィルタ（カスタムフィルタから）
+          if (params.filterModel.completed) {
+            const completedFilter = params.filterModel.completed
+            // カスタムフィルタのモデル形式: { value: boolean }
+            if (completedFilter.value !== undefined) {
+              filters.completed = completedFilter.value === true || completedFilter.value === 'true'
+            }
+          }
+          // task_nameフィルタ
+          if (params.filterModel.task_name) {
+            const taskNameFilter = params.filterModel.task_name
+            if (taskNameFilter.filterType === 'text' && taskNameFilter.type === 'contains') {
+              filters.taskName = taskNameFilter.filter
+            }
+          }
+          // project_nameフィルタ
+          if (params.filterModel.project_name) {
+            const projectNameFilter = params.filterModel.project_name
+            if (projectNameFilter.filterType === 'set' && projectNameFilter.values && projectNameFilter.values.length > 0) {
+              filters.projectName = projectNameFilter.values[0]
+            } else if (projectNameFilter.filterType === 'text' && projectNameFilter.type === 'contains') {
+              filters.projectName = projectNameFilter.filter
+            }
+          }
+        }
+        
+        const skip = params.startRow
+        const limit = params.endRow - params.startRow
+        
+        const result = await fetchAllTodos(skip, limit, sortBy, sortOrder, filters)
+        
+        const rowData = result.items.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          completed: item.completed,
+          order: item.order,
+          scheduled_date: item.scheduled_date || null,
+          completed_date: item.completed_date || null,
+          task_name: item.task_name || null,
+          project_name: item.project_name || null,
+        }))
+        
+        const lastRow = result.items.length < limit 
+          ? skip + result.items.length
+          : undefined
+        
+        params.successCallback(rowData, lastRow)
+      } catch (e) {
+        console.error('getRows error', e)
+        params.failCallback()
+      }
+    },
   }
 }
 
-// ソート変更時の処理（専用のイベントハンドラー）
-const onSortChanged = () => {
-  if (!gridRef.value?.api || isInitializing.value) return
-  
-  // getColumnStateからソート情報を取得
-  const columnState = gridRef.value.api.getColumnState()
-  const sortFromState = columnState
-    .filter((col: any) => col.sort)
-    .sort((a: any, b: any) => (a.sortIndex || 0) - (b.sortIndex || 0))
-    .map((col: any) => ({ colId: col.colId, sort: col.sort }))
-  
-  if (sortFromState.length > 0) {
-    sortModel.value = sortFromState
-    setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, sortFromState)
-  } else {
-    sortModel.value = []
-    setLocalStorage(STORAGE_KEYS.TODO_LIST_SORT_MODEL, null)
-  }
+// 日付をフォーマット
+const formatDateForDisplay = (dateString: string | null | undefined): string => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-// フィルタ変更時の処理
-const onFilterChanged = () => {
-  if (!gridRef.value?.api || isInitializing.value) return
-  
-  const model = gridRef.value.api.getFilterModel()
-  filterModel.value = model
-  setLocalStorage(STORAGE_KEYS.TODO_LIST_FILTER_MODEL, Object.keys(model).length > 0 ? model : null)
-}
-
-// ページネーション変更時の処理
-const onPaginationChanged = () => {
-  if (!gridRef.value?.api || isInitializing.value) return
-  
-  // paginationGetPageSizeが存在しない場合は、getGridOptionを使用
-  let pageSize: number
-  if (typeof gridRef.value.api.paginationGetPageSize === 'function') {
-    pageSize = gridRef.value.api.paginationGetPageSize()
-  } else if (typeof gridRef.value.api.getGridOption === 'function') {
-    pageSize = gridRef.value.api.getGridOption('paginationPageSize') || 50
-  } else {
-    return
-  }
-  
-  // 初期値と異なる場合のみ保存（初期化時の自動設定を無視）
-  if (paginationPageSize.value !== pageSize) {
-    paginationPageSize.value = pageSize
-    setLocalStorage(STORAGE_KEYS.TODO_LIST_PAGE_SIZE, pageSize)
-  }
-}
-
-// TODOリストデータ（タスク名とプロジェクト名を含む）
-interface TodoListItem {
-  id: number
-  task_id: number
-  title: string
-  completed: boolean
-  task_name: string
-  project_name: string
-  scheduled_date?: string | null
-  completed_date?: string | null
-}
-
-const todoListData = ref<TodoListItem[]>([])
-
-// プロジェクト名を取得
-const getProjectName = (projectId: number): string => {
-  if (projectId === -1) {
-    return '個人タスク'
-  }
-  const project = projects.value.find((p: Project) => p.id === projectId)
-  return project ? project.name : '不明'
-}
-
-// TODOリストデータを更新（サーバーサイドページネーションを使用）
-const updateTodoListData = async () => {
-  try {
-    // プロジェクト情報を取得（プロジェクト名の取得用）
-    await fetchProjects()
+// 完了カラム用のカスタムフィルタ（Community版対応）
+const CompletedFilter = defineComponent({
+  props: {
+    params: {
+      type: Object as () => IFilterParams,
+      required: true,
+    },
+  },
+  setup(props: { params: IFilterParams }) {
+    const selectedValue = ref<boolean | null>(null)
     
-    // すべてのTODOを取得（サーバーサイドページネーション）
-    // 注意: AG Gridがクライアントサイドページネーションを使用するため、
-    // 一度にすべてのデータを取得する（大量データの場合はサーバーサイドページネーションに変更可能）
-    const response = await fetchAllTodos(0, 10000) // 最大10000件まで取得
+    const doesFilterPass = (node: any): boolean => {
+      if (selectedValue.value === null) {
+        return true
+      }
+      const isCompleted = !!node.data?.completed_date
+      return isCompleted === selectedValue.value
+    }
     
-    // レスポンスデータをTodoListItem形式に変換
-    const allTodos: TodoListItem[] = response.items.map((item: any) => ({
-      id: item.id,
-      task_id: item.task_id,
-      title: item.title,
-      completed: item.completed,
-      task_name: item.task_name || '不明',
-      project_name: item.project_name || (item.project_id === -1 ? '個人タスク' : '不明'),
-      scheduled_date: item.scheduled_date,
-      completed_date: item.completed_date,
-    }))
+    const isFilterActive = (): boolean => {
+      return selectedValue.value !== null
+    }
     
-    todoListData.value = allTodos
-  } catch (e) {
-    console.error('Error updating todo list data:', e)
-    // エラー時は空配列を設定
-    todoListData.value = []
-  }
-}
+    const getModel = (): any => {
+      if (selectedValue.value === null) {
+        return null
+      }
+      return { value: selectedValue.value }
+    }
+    
+    const setModel = (model: any): void => {
+      if (model && model.value !== undefined) {
+        selectedValue.value = model.value
+      } else {
+        selectedValue.value = null
+      }
+    }
+    
+    const onChange = (e: Event) => {
+      const target = e.target as HTMLSelectElement
+      if (target.value === '') {
+        selectedValue.value = null
+      } else {
+        selectedValue.value = target.value === 'true'
+      }
+      props.params.filterChangedCallback()
+    }
+    
+    // フィルタインターフェースのメソッドを公開
+    return {
+      selectedValue,
+      onChange,
+      // フィルタインターフェースのメソッドを公開
+      doesFilterPass,
+      isFilterActive,
+      getModel,
+      setModel,
+    }
+  },
+  render() {
+    return h('div', { class: 'completed-filter' }, [
+      h('div', { class: 'filter-label' }, '完了状態:'),
+      h('select', {
+        class: 'filter-select',
+        value: (this as any).selectedValue === null ? '' : (this as any).selectedValue.toString(),
+        onChange: (this as any).onChange,
+      }, [
+        h('option', { value: '' }, 'すべて'),
+        h('option', { value: 'true' }, '完了'),
+        h('option', { value: 'false' }, '未完了'),
+      ]),
+    ])
+  },
+})
 
-// グリッドコンテキスト（セルレンダラーからアクセス可能）
-const gridContext = {
-  updateTodoListData,
-  updateTodo,
-}
-
-// チェックボックスセルレンダラー（読み取り専用：完了状態は実行完了日で自動管理）
-const CheckboxCellRenderer = defineComponent({
+// 完了チェックボックスセルレンダラー（編集不能、completed_dateの有無で判断）
+const CompletedCellRenderer = defineComponent({
   props: {
     params: {
       type: Object as () => ICellRendererParams,
@@ -482,12 +406,14 @@ const CheckboxCellRenderer = defineComponent({
     },
   },
   setup(props: { params: ICellRendererParams }) {
-    // 完了状態は実行完了日で自動管理されるため、チェックボックスは読み取り専用
+    // completed_dateの有無で完了状態を判断
+    const isCompleted = !!props.params.data?.completed_date
+    
     return () => h('div', { class: 'checkbox-cell' }, [
       h('input', {
         type: 'checkbox',
-        checked: props.params.data?.completed || false,
-        disabled: true, // 読み取り専用
+        checked: isCompleted,
+        disabled: true,
         class: 'todo-checkbox',
       }),
     ])
@@ -504,21 +430,18 @@ const DateCellRenderer = defineComponent({
   },
   setup(props: { params: ICellRendererParams }) {
     const handleChange = async (field: 'scheduled_date' | 'completed_date', value: string) => {
-      const todoData = props.params.data as TodoListItem | undefined
-      const context = props.params.context as typeof gridContext | undefined
-      if (todoData && context) {
+      const todoData = props.params.data as any
+      if (todoData) {
         try {
-          // 実行完了日が設定された場合は自動的にcompletedをtrueに、削除された場合はfalseに
-          const updateData: { scheduled_date?: string | null; completed_date?: string | null; completed?: boolean } = {}
+          const updateData: { scheduled_date?: string | null; completed_date?: string | null } = {}
           updateData[field] = value || null
           
-          if (field === 'completed_date') {
-            // 実行完了日が設定された場合はcompletedをtrue、削除された場合はfalseに
-            updateData.completed = value ? true : false
-          }
+          await updateTodo(todoData.id, updateData)
           
-          await context.updateTodo(todoData.id, updateData)
-          await context.updateTodoListData()
+          // Infinite Scrollでは、データを再読み込みするためにキャッシュをリフレッシュ
+          if (gridRef.value?.api && typeof gridRef.value.api.refreshInfiniteCache === 'function') {
+            gridRef.value.api.refreshInfiniteCache()
+          }
         } catch (e) {
           console.error('Error updating todo date:', e)
           alert('日付の更新に失敗しました')
@@ -537,83 +460,68 @@ const DateCellRenderer = defineComponent({
 
     return () => {
       const field = props.params.colDef?.field as 'scheduled_date' | 'completed_date' | undefined
-      const value = props.params.data?.[field] || null
+      const dateValue = props.params.data?.[field] || null
       
-      return h('div', { class: 'date-cell' }, [
-        h('input', {
-          type: 'date',
-          value: value ? formatDateForInput(value) : '',
-          onChange: (e: Event) => {
-            const target = e.target as HTMLInputElement
-            if (field) {
-              handleChange(field, target.value)
-            }
-          },
-          class: 'date-input',
-        }),
-      ])
+      return h('input', {
+        type: 'date',
+        value: formatDateForInput(dateValue),
+        class: 'date-input',
+        onInput: (e: Event) => {
+          const target = e.target as HTMLInputElement
+          handleChange(field!, target.value)
+        },
+      })
     }
   },
 })
-
-// 日付をフォーマット（表示用）
-const formatDateForDisplay = (dateString: string | null | undefined): string => {
-  if (!dateString) return '-'
-  const date = new Date(dateString)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 // Column Definitions
 const columnDefs = ref([
   {
     headerName: '完了',
     field: 'completed',
-    cellRenderer: CheckboxCellRenderer,
+    cellRenderer: CompletedCellRenderer,
     width: 100,
     sortable: true,
-    filter: 'agSetColumnFilter',
-    filterParams: {
-      values: [true, false],
-      cellRenderer: (params: any) => {
-        return params.value ? '完了' : '未完了'
-      },
-    },
-    floatingFilter: false,  // チェックボックスカラムはフローティングフィルタを無効化
     resizable: false,
+    // Community版対応: カスタムフィルタを使用
+    filter: CompletedFilter,
+    floatingFilter: false,
     cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    valueGetter: (params: any) => {
+      // completed_dateの有無で完了状態を返す（ソート・フィルタ用）
+      return !!params.data?.completed_date
+    },
   },
   { 
     field: 'title', 
-    headerName: 'TODO', 
-    flex: 2,
+    headerName: 'タイトル', 
+    flex: 1,
+    sortable: true,
     filter: 'agTextColumnFilter',
-    cellStyle: (params: any) => {
-      if (params.data?.completed) {
-        return { textDecoration: 'line-through', opacity: 0.7 }
-      }
-      return {}
-    },
+    floatingFilter: true,
   },
   { 
     field: 'task_name', 
-    headerName: 'タスク名', 
-    flex: 2,
+    headerName: 'タスク', 
+    flex: 1,
+    sortable: true,
     filter: 'agTextColumnFilter',
+    floatingFilter: true,
   },
   { 
     field: 'project_name', 
-    headerName: 'プロジェクト名', 
+    headerName: 'プロジェクト', 
     flex: 1,
-    filter: 'agSetColumnFilter',
+    sortable: true,
+    filter: 'agTextColumnFilter',
+    floatingFilter: true,
   },
   {
     field: 'scheduled_date',
-    headerName: '実行予定日',
+    headerName: '予定日',
     cellRenderer: DateCellRenderer,
-    width: 180,
+    width: 150,
     sortable: true,
     filter: 'agDateColumnFilter',
     filterParams: {
@@ -631,6 +539,7 @@ const columnDefs = ref([
       },
       browserDatePicker: true,
     },
+    floatingFilter: true,
     valueGetter: (params: any) => {
       const dateStr = params.data?.scheduled_date
       if (!dateStr) return null
@@ -649,9 +558,9 @@ const columnDefs = ref([
   },
   {
     field: 'completed_date',
-    headerName: '実行完了日',
+    headerName: '完了日',
     cellRenderer: DateCellRenderer,
-    width: 180,
+    width: 150,
     sortable: true,
     filter: 'agDateColumnFilter',
     filterParams: {
@@ -669,6 +578,7 @@ const columnDefs = ref([
       },
       browserDatePicker: true,
     },
+    floatingFilter: true,
     valueGetter: (params: any) => {
       const dateStr = params.data?.completed_date
       if (!dateStr) return null
@@ -687,212 +597,39 @@ const columnDefs = ref([
   },
 ])
 
-// Default Column Definitions
+// Default Column Definitions（フィルタ対応）
 const defaultColDef = ref({
   sortable: true,
-  filter: 'agTextColumnFilter',  // デフォルトフィルタタイプをテキストフィルタに設定
   resizable: true,
-  floatingFilter: false,  // フローティングフィルタを無効化（フィルタメニューを使用）
+  filter: 'agTextColumnFilter',
+  floatingFilter: true,
+  // カラム定義で明示的に指定されたフィルタを優先
+  suppressHeaderMenuButton: false,
 })
-
-// 状態復元フラグ（重複復元を防ぐ）
-let hasRestoredState = false
-let retryCount = 0
-
-// 状態を復元する関数
-const restoreGridState = () => {
-  if (!gridRef.value || hasRestoredState) return
-  
-  // 再試行回数の上限チェック
-  if (retryCount >= MAX_RETRY_COUNT) {
-    console.error('Failed to restore grid state: Max retry count reached')
-    isInitializing.value = false
-    return
-  }
-  
-  // AG GridのAPIが準備できているか確認
-  const api = gridRef.value.api
-  if (!api) {
-    retryCount++
-    console.log(`AG Grid API not ready yet, retrying... (${retryCount}/${MAX_RETRY_COUNT})`)
-    setTimeout(() => {
-      if (!hasRestoredState && gridRef.value) {
-        restoreGridState()
-      }
-    }, RESTORE_STATE_TIMEOUTS.INITIAL)
-    return
-  }
-  
-  // APIメソッドの存在確認（AG Gridのバージョンによってメソッド名が異なる可能性があるため、代替方法も試す）
-  const hasPaginationMethod = typeof api.paginationSetPageSize === 'function' || 
-                              typeof api.setGridOption === 'function'
-  const hasColumnStateMethod = typeof api.applyColumnState === 'function' || 
-                               typeof api.setGridOption === 'function'
-  const hasFilterMethod = typeof api.setFilterModel === 'function' || 
-                          typeof api.setGridOption === 'function'
-  
-  if (!hasPaginationMethod || !hasColumnStateMethod || !hasFilterMethod) {
-    retryCount++
-    setTimeout(() => {
-      if (!hasRestoredState && gridRef.value) {
-        restoreGridState()
-      }
-    }, RESTORE_STATE_TIMEOUTS.INITIAL)
-    return
-  }
-  
-  // 初期化中フラグを設定
-  isInitializing.value = true
-  retryCount = 0 // 成功したらリセット
-  
-  try {
-    // ページサイズを明示的に設定（paginationSetPageSizeは存在しないため、setGridOptionを使用）
-    const pageSizeValue = paginationPageSize.value
-    if (typeof api.setGridOption === 'function') {
-      api.setGridOption('paginationPageSize', pageSizeValue)
-    }
-    
-    // ソートモデルを復元（優先的にソート状態を復元）
-    // AG Gridのドキュメントによると、applyColumnStateを使用してソート状態を復元する
-    if (sortModel.value.length > 0) {
-      // sortModelをapplyColumnState用の形式に変換
-      const sortColumnState = sortModel.value.map((sort: any, index: number) => ({
-        colId: sort.colId,
-        sort: sort.sort,
-        sortIndex: index,
-      }))
-      
-      if (typeof api.applyColumnState === 'function') {
-        api.applyColumnState({ 
-          state: sortColumnState,
-          applyOrder: false  // ソートのみを適用、カラムの順序は変更しない
-        })
-      }
-    } else if (columnState.value.length > 0) {
-      // ソートモデルがない場合は、カラム状態からソートを復元
-      const sortFromState = columnState.value
-        .filter((col: any) => col.sort)
-        .sort((a: any, b: any) => (a.sortIndex || 0) - (b.sortIndex || 0))
-        .map((col: any) => ({ 
-          colId: col.colId, 
-          sort: col.sort,
-          sortIndex: col.sortIndex || 0
-        }))
-      
-      if (sortFromState.length > 0) {
-        if (typeof api.applyColumnState === 'function') {
-          api.applyColumnState({ 
-            state: sortFromState,
-            applyOrder: false  // ソートのみを適用、カラムの順序は変更しない
-          })
-          console.log('Sort model restored from column state via applyColumnState:', sortFromState)
-        }
-      }
-    }
-    
-    // カラム状態を復元（幅や表示/非表示など、ソートは除外）
-    if (columnState.value.length > 0) {
-      if (typeof api.applyColumnState === 'function') {
-        // ソート情報を除外してカラム状態を適用
-        const stateWithoutSort = columnState.value.map((col: any) => ({
-          ...col,
-          sort: undefined,
-          sortIndex: undefined,
-        }))
-        api.applyColumnState({ 
-          state: stateWithoutSort,
-          applyOrder: true
-        })
-      } else if (typeof api.setGridOption === 'function') {
-        // 代替方法：各カラムの状態を個別に設定
-        columnState.value.forEach((colState: any) => {
-          const column = api.getColumn(colState.colId)
-          if (column) {
-            if (colState.width) column.setActualWidth(colState.width)
-            if (colState.hide !== undefined) column.setVisible(!colState.hide)
-          }
-        })
-      }
-    }
-    
-    // フィルタモデルを復元
-    if (Object.keys(filterModel.value).length > 0) {
-      if (typeof api.setFilterModel === 'function') {
-        api.setFilterModel(filterModel.value)
-      } else if (typeof api.setGridOption === 'function') {
-        api.setGridOption('filterModel', filterModel.value)
-      }
-    }
-    
-    hasRestoredState = true
-  } catch (e) {
-    console.error('Error restoring grid state:', e)
-  } finally {
-    // 初期化完了（少し遅延させてイベントが処理されるようにする）
-    setTimeout(() => {
-      isInitializing.value = false
-    }, RESTORE_STATE_TIMEOUTS.COMPLETE)
-  }
-}
 
 // Grid Readyイベントハンドラー
-const onGridReady = () => {
-  // グリッドが準備できたら状態を復元（少し待ってから）
-  if (!hasRestoredState && todoListData.value.length > 0) {
-    setTimeout(() => {
-      if (!hasRestoredState) {
-        restoreGridState()
-      }
-    }, RESTORE_STATE_TIMEOUTS.GRID_READY)
-  }
+const onGridReady = (params: any) => {
+  console.log('onGridReady')
+  params.api.setGridOption('datasource', createDatasource())
 }
-
-// 最初のデータレンダリング後の処理
-const onFirstDataRendered = () => {
-  // データがレンダリングされた後に状態を復元（まだ復元されていない場合）
-  // AG GridのAPIが完全に初期化されるまで少し待つ
-  if (!hasRestoredState) {
-    setTimeout(() => {
-      if (!hasRestoredState) {
-        restoreGridState()
-      }
-    }, RESTORE_STATE_TIMEOUTS.FIRST_DATA_RENDERED)
-  }
-}
-
-// データが更新された時に状態を復元（初回のみ）
-watch(todoListData, async (newData) => {
-  if (newData.length > 0 && !hasRestoredState && gridRef.value?.api) {
-    await nextTick()
-    restoreGridState()
-  }
-}, { immediate: false })
-
-// 初期データを読み込む
-onMounted(async () => {
-  await fetchProjects()
-  await updateTodoListData()
-  // データが読み込まれた後に状態を復元
-  await nextTick()
-  // 状態復元はonFirstDataRenderedで行うため、ここでは何もしない
-})
 </script>
 
 <style lang="scss" scoped>
 @import '../styles/_theme';
 
 .todo-list {
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
 }
 
 .todo-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
 
   h2 {
     margin: 0 0 1rem 0;
-    color: var(--current-textPrimary);
     font-size: 2rem;
     font-weight: 600;
   }
@@ -969,34 +706,12 @@ onMounted(async () => {
 }
 
 .todo-content {
-  background: var(--current-backgroundLight);
-  border-radius: 8px;
-  padding: 2rem;
-  box-shadow: 0 2px 8px var(--current-shadowMd);
+  flex: 1;
+  min-height: 0;
 }
 
-.todo-section {
-  margin-bottom: 2rem;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-
-.loading-message {
-  text-align: center;
-  padding: 2rem;
-  color: var(--current-textSecondary);
-  font-size: 1rem;
-}
-
-.error-message {
-  background: var(--current-errorBackground);
-  color: var(--current-errorText);
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-  border: 1px solid var(--current-errorBorder);
+.todo-grid {
+  height: 100%;
 }
 
 :deep(.checkbox-cell) {
@@ -1006,46 +721,50 @@ onMounted(async () => {
   height: 100%;
   
   .todo-checkbox {
-    cursor: pointer;
-    width: 1.25rem;
-    height: 1.25rem;
+    cursor: not-allowed;
   }
 }
 
-:deep(.date-cell) {
+:deep(.date-input) {
+  width: 100%;
+  padding: 0.25rem;
+  border: 1px solid var(--current-borderColor);
+  border-radius: 4px;
+  background: var(--current-backgroundLight);
+  color: var(--current-textPrimary);
+  font-size: 0.875rem;
+}
+
+:deep(.completed-filter) {
+  padding: 0.5rem;
   display: flex;
-  align-items: center;
-  height: 100%;
-  padding: 0.25rem 0;
+  flex-direction: column;
+  gap: 0.5rem;
   
-  .date-input {
-    width: 100%;
-    padding: 0.375rem 0.5rem;
+  .filter-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--current-textPrimary);
+  }
+  
+  .filter-select {
+    padding: 0.375rem;
     border: 1px solid var(--current-borderColor);
     border-radius: 4px;
     background: var(--current-backgroundLight);
     color: var(--current-textPrimary);
-  font-size: 0.875rem;
-    transition: border-color 0.2s;
+    font-size: 0.875rem;
+    cursor: pointer;
+    
+    &:hover {
+      border-color: var(--current-linkColor);
+    }
     
     &:focus {
       outline: none;
       border-color: var(--current-linkColor);
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
     }
   }
-}
-
-// AG Gridのテーマカスタマイズ
-:deep(.ag-theme-quartz) {
-  --ag-background-color: var(--current-backgroundLight);
-  --ag-header-background-color: var(--current-navBackground);
-  --ag-header-foreground-color: var(--current-textPrimary);
-  --ag-odd-row-background-color: var(--current-backgroundLight);
-  --ag-row-hover-color: var(--current-hoverBackground);
-  --ag-border-color: var(--current-borderColor);
-  --ag-font-family: inherit;
-  --ag-font-size: 0.875rem;
-  --ag-foreground-color: var(--current-textPrimary);
-  --ag-selected-row-background-color: var(--current-activeBackground);
 }
 </style>

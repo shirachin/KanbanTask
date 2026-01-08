@@ -3,6 +3,7 @@ TODO API routes
 """
 import logging
 from datetime import datetime, date
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -20,10 +21,16 @@ router = APIRouter()
 def get_all_todos(
     skip: int = 0,
     limit: int = 100,
+    sort_by: Optional[str] = None,
+    sort_order: Optional[str] = "asc",
+    title: Optional[str] = None,
+    completed: Optional[bool] = None,
+    task_name: Optional[str] = None,
+    project_name: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
-    Get all todos with pagination
+    Get all todos with pagination, sorting, and filtering
     
     Returns a paginated list of todos with task and project information.
     """
@@ -32,8 +39,47 @@ def get_all_todos(
             Project, Task.project_id == Project.id
         )
         
+        # フィルタリング
+        if title:
+            query = query.filter(Todo.title.ilike(f'%{title}%'))
+        if completed is not None:
+            query = query.filter(Todo.completed == completed)
+        if task_name:
+            query = query.filter(Task.title.ilike(f'%{task_name}%'))
+        if project_name:
+            query = query.filter(Project.name.ilike(f'%{project_name}%'))
+        
+        # ソート
+        sort_column = Todo.order  # デフォルト
+        if sort_by:
+            if sort_by == "id":
+                sort_column = Todo.id
+            elif sort_by == "title":
+                sort_column = Todo.title
+            elif sort_by == "completed":
+                sort_column = Todo.completed
+            elif sort_by == "order":
+                sort_column = Todo.order
+            elif sort_by == "scheduled_date":
+                sort_column = Todo.scheduled_date
+            elif sort_by == "completed_date":
+                sort_column = Todo.completed_date
+            elif sort_by == "created_at":
+                sort_column = Todo.created_at
+            elif sort_by == "updated_at":
+                sort_column = Todo.updated_at
+            elif sort_by == "task_name":
+                sort_column = Task.title
+            elif sort_by == "project_name":
+                sort_column = Project.name
+        
+        if sort_order == "desc":
+            query = query.order_by(sort_column.desc())
+        else:
+            query = query.order_by(sort_column.asc())
+        
         total = query.count()
-        todos = query.order_by(Todo.order).offset(skip).limit(limit).all()
+        todos = query.offset(skip).limit(limit).all()
         
         result = []
         for todo in todos:

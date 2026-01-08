@@ -863,6 +863,8 @@ watch([selectedProjectMode, selectedProjectId, displayProjectIds], () => {
 
 .kanban-content {
   overflow-x: auto;
+  overflow-y: visible;
+  height: 100%;
 }
 
 .kanban-columns {

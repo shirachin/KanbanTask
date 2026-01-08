@@ -5,39 +5,17 @@
     </div>
     
     <div class="project-content">
-      <div v-if="error" class="error-message">
-        {{ error }}
-      </div>
-      <div class="project-section">
-        <div class="section-header">
-          <h3 class="section-title">プロジェクト一覧</h3>
-          <button type="button" class="add-project-button" @click="openAddModal" :disabled="loading">
-            <span class="material-symbols-outlined">add</span>
-            プロジェクト追加
-          </button>
-        </div>
-        <div v-if="loading && rowData.length === 0" class="loading-message">
-          読み込み中...
-        </div>
-        <AgGridVue
-          v-else
-          ref="gridRef"
-          :rowData="rowData"
-          :columnDefs="columnDefs"
-          :defaultColDef="defaultColDef"
-          :pagination="true"
-          :paginationPageSize="paginationPageSize"
-          :paginationPageSizeSelector="[25, 50, 100, 200]"
-          @columnStateChanged="onColumnStateChanged"
-          @filterChanged="onFilterChanged"
-          @paginationChanged="onPaginationChanged"
-          @sortChanged="onSortChanged"
-          @firstDataRendered="onFirstDataRendered"
-          @gridReady="onGridReady"
-          class="ag-theme-quartz"
-          style="height: 500px; width: 100%;"
-        />
-      </div>
+      <AgGridVue
+        ref="gridRef"
+        :rowModelType="'infinite'"
+        :columnDefs="columnDefs"
+        :defaultColDef="defaultColDef"
+        :cacheBlockSize="25"
+        :maxBlocksInCache="10"
+        @gridReady="onGridReady"
+        class="ag-theme-quartz project-grid"
+        style="width: 100%; height: 100%;"
+      />
     </div>
     
     <ProjectEditModal
@@ -49,79 +27,107 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineComponent, h, onMounted, watch, nextTick } from 'vue'
+import { ref, defineComponent, h } from 'vue'
 import { AgGridVue } from 'ag-grid-vue3'
-import type { ICellRendererParams, ColumnState, FilterModel } from 'ag-grid-community'
-import AssigneeCellRenderer from '../components/AssigneeCellRenderer.vue'
+import type { ICellRendererParams, IDatasource, IGetRowsParams } from 'ag-grid-community'
 import ProjectEditModal from '../components/ProjectEditModal.vue'
 import { useProjects, type Project } from '../composables/useProjects'
-import { getLocalStorage, setLocalStorage, STORAGE_KEYS } from '../composables/useLocalStorage'
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, MAX_RETRY_COUNT, RESTORE_STATE_TIMEOUTS } from '../constants/grid'
+import { handleApiError } from '../utils/apiClient'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
 // API composableを使用
-const { projects, loading, error, fetchProjects, createProject, updateProject, deleteProject } = useProjects()
+const { fetchProjects, createProject, updateProject, deleteProject, error } = useProjects()
 
 // AG Gridの参照
 const gridRef = ref<InstanceType<typeof AgGridVue> | null>(null)
-
-// ページネーションサイズ
-const savedPageSize = getLocalStorage<number>(STORAGE_KEYS.PROJECT_MANAGEMENT_PAGE_SIZE, DEFAULT_PAGE_SIZE)
-const paginationPageSize = ref<number>(PAGE_SIZE_OPTIONS.includes(savedPageSize as typeof PAGE_SIZE_OPTIONS[number]) ? savedPageSize : DEFAULT_PAGE_SIZE)
-
-// 初期化フラグ（初期化時のイベントを無視するため）
-const isInitializing = ref(true)
-
-// カラム状態（ソート、表示/非表示、幅など）
-const savedColumnState = getLocalStorage<ColumnState[]>(STORAGE_KEYS.PROJECT_MANAGEMENT_COLUMN_STATE, [])
-const columnState = ref<ColumnState[]>(savedColumnState)
-
-// ソートモデル（ソート状態を保存するため）
-interface SortModel {
-  colId: string
-  sort: 'asc' | 'desc'
-}
-const savedSortModel = getLocalStorage<SortModel[]>(STORAGE_KEYS.PROJECT_MANAGEMENT_COLUMN_STATE + '_sort', [])
-const sortModel = ref<SortModel[]>(savedSortModel)
-
-// フィルタモデル
-const savedFilterModel = getLocalStorage<FilterModel>(STORAGE_KEYS.PROJECT_MANAGEMENT_FILTER_MODEL, {})
-const filterModel = ref<FilterModel>(savedFilterModel)
 
 // モーダルの表示状態
 const showEditModal = ref(false)
 const editingProject = ref<Project | null>(null)
 
-// AG Grid用のrowData（projectsを変換）
-const rowData = ref<Project[]>([])
-
-// projectsが変更されたらrowDataを更新（システム用プロジェクト（id=-1）は除外）
-const updateRowData = () => {
-  rowData.value = projects.value
-    .filter((p: Project) => p.id !== -1)  // システム用プロジェクト（id=-1）を除外
-    .map((p: Project) => ({
-      id: p.id,
-      name: p.name,
-      startMonth: p.startMonth || '',
-      endMonth: p.endMonth || '',
-      assignee: p.assignee || [],
-    }))
+// カラム名のマッピング（フロントエンド → バックエンド）
+const columnNameMap: Record<string, string> = {
+  'id': 'id',
+  'name': 'name',
+  'startMonth': 'start_month',
+  'endMonth': 'end_month',
+  'created_at': 'created_at',
+  'updated_at': 'updated_at',
 }
 
-// プロジェクトを監視してrowDataを更新
-watch(projects, updateRowData, { deep: true })
-
-// 新規追加モーダルを開く関数
-const openAddModal = () => {
-  editingProject.value = {
-    id: 0, // 新規作成時は0
-    name: '',
-    startMonth: '',
-    endMonth: '',
-    assignee: [''],
+// Infinite Scroll用のdatasource（ソート・フィルタ対応）
+const createDatasource = (): IDatasource => {
+  return {
+    getRows: async (params: IGetRowsParams) => {
+      console.log('getRows', { startRow: params.startRow, endRow: params.endRow, sortModel: params.sortModel, filterModel: params.filterModel })
+      
+      try {
+        // ソート情報を取得
+        let sortBy: string | undefined = undefined
+        let sortOrder: 'asc' | 'desc' = 'desc'
+        
+        if (params.sortModel && params.sortModel.length > 0) {
+          const firstSort = params.sortModel[0]
+          sortBy = columnNameMap[firstSort.colId] || firstSort.colId
+          sortOrder = firstSort.sort
+          console.log('getRows: Using sort', { colId: firstSort.colId, sortBy, sortOrder })
+        } else {
+          // デフォルトのソート（created_at desc）
+          sortBy = 'created_at'
+          sortOrder = 'desc'
+        }
+        
+        // フィルタ情報を取得
+        const filters: { name?: string; startMonth?: string; endMonth?: string } = {}
+        if (params.filterModel) {
+          // nameフィルタ
+          if (params.filterModel.name) {
+            const nameFilter = params.filterModel.name
+            if (nameFilter.filterType === 'text' && nameFilter.type === 'contains') {
+              filters.name = nameFilter.filter
+            }
+          }
+          // startMonthフィルタ
+          if (params.filterModel.startMonth) {
+            const startMonthFilter = params.filterModel.startMonth
+            if (startMonthFilter.filterType === 'text' && startMonthFilter.type === 'equals') {
+              filters.startMonth = startMonthFilter.filter
+            }
+          }
+          // endMonthフィルタ
+          if (params.filterModel.endMonth) {
+            const endMonthFilter = params.filterModel.endMonth
+            if (endMonthFilter.filterType === 'text' && endMonthFilter.type === 'equals') {
+              filters.endMonth = endMonthFilter.filter
+            }
+          }
+        }
+        
+        const skip = params.startRow
+        const limit = params.endRow - params.startRow
+        
+        const result = await fetchProjects(undefined, skip, limit, sortBy, sortOrder, filters)
+        
+        const rowData = result.items.map((p: Project) => ({
+            id: p.id,
+            name: p.name,
+            startMonth: p.startMonth || '',
+            endMonth: p.endMonth || '',
+            assignee: p.assignee || [],
+          }))
+        
+        const lastRow = result.items.length < limit 
+          ? skip + result.items.length
+          : undefined
+        
+        params.successCallback(rowData, lastRow)
+      } catch (e) {
+        console.error('getRows error', e)
+        params.failCallback()
+      }
+    },
   }
-  showEditModal.value = true
 }
 
 // 編集モーダルを開く関数
@@ -150,7 +156,10 @@ const handleSaveProject = async (project: Project) => {
         assignee: project.assignee,
       })
     }
-    updateRowData()
+    // Infinite Scrollでは、データを再読み込みするためにキャッシュをリフレッシュ
+    if (gridRef.value?.api && typeof gridRef.value.api.refreshInfiniteCache === 'function') {
+      gridRef.value.api.refreshInfiniteCache()
+    }
   } catch (e) {
     console.error('Error saving project:', e)
     alert(error.value || 'プロジェクトの保存に失敗しました')
@@ -161,33 +170,15 @@ const handleSaveProject = async (project: Project) => {
 const handleDeleteProject = async (projectId: number) => {
   try {
     await deleteProject(projectId)
-    updateRowData()
+    // Infinite Scrollでは、データを再読み込みするためにキャッシュをリフレッシュ
+    if (gridRef.value?.api && typeof gridRef.value.api.refreshInfiniteCache === 'function') {
+      gridRef.value.api.refreshInfiniteCache()
+    }
   } catch (e) {
     console.error('Error deleting project:', e)
     alert(error.value || 'プロジェクトの削除に失敗しました')
   }
 }
-
-// 初期データを読み込む
-onMounted(async () => {
-  await fetchProjects()
-  updateRowData()
-  // データが読み込まれた後に状態を復元
-  await nextTick()
-  if (gridRef.value?.api && rowData.value.length > 0) {
-    if (!hasRestoredState) {
-      restoreGridState()
-    }
-  }
-})
-
-// データが更新された時に状態を復元（初回のみ）
-watch(rowData, async (newData) => {
-  if (newData.length > 0 && !hasRestoredState && gridRef.value?.api) {
-    await nextTick()
-    restoreGridState()
-  }
-}, { immediate: false })
 
 // ボタンセルレンダラーコンポーネント
 const ButtonCellRenderer = defineComponent({
@@ -232,10 +223,10 @@ const ButtonCellRenderer = defineComponent({
   },
 })
 
-// Column Definitions: Defines the columns to be displayed.
+// Column Definitions
 const columnDefs = ref([
   {
-    headerName: 'ボタン',
+    headerName: '',
     cellRenderer: ButtonCellRenderer,
     width: 150,
     sortable: false,
@@ -243,246 +234,22 @@ const columnDefs = ref([
     resizable: false,
   },
   { field: 'name', headerName: 'プロジェクト名', flex: 1 },
-  { field: 'startMonth', headerName: '開始月', width: 120 },
-  { field: 'endMonth', headerName: '終了月', width: 120 },
-  { 
-    field: 'assignee',
-    headerName: '担当者', 
-    width: 200,
-    cellRenderer: AssigneeCellRenderer,
-    autoHeight: true,
-    wrapText: false,
-    valueFormatter: (params: any) => {
-      // 警告を回避するためのフォーマッター（実際の表示はcellRendererで行う）
-      const assignees = Array.isArray(params.value) ? params.value : params.value ? [params.value] : []
-      return assignees.join(', ')
-    },
-  },
+  { field: 'startMonth', headerName: '開始月', width: 200 },
+  { field: 'endMonth', headerName: '終了月', width: 200 },
 ])
 
-// Default Column Definitions
+// Default Column Definitions（フィルタ対応）
 const defaultColDef = ref({
   sortable: true,
-  filter: 'agTextColumnFilter',
   resizable: true,
-  floatingFilter: false,
+  filter: 'agTextColumnFilter',
+  floatingFilter: true,
 })
 
-// カラム状態変更時の処理
-const onColumnStateChanged = () => {
-  if (!gridRef.value?.api || isInitializing.value) return
-  
-  const state = gridRef.value.api.getColumnState()
-  const relevantState = state.map((col: any) => ({
-    colId: col.colId,
-    sort: col.sort,
-    sortIndex: col.sortIndex,
-    width: col.width,
-    hide: col.hide,
-  }))
-  
-  columnState.value = relevantState
-  setLocalStorage(STORAGE_KEYS.PROJECT_MANAGEMENT_COLUMN_STATE, relevantState.length > 0 ? relevantState : null)
-  
-  // ソートモデルも別途保存
-  const columnStateForSort = gridRef.value.api.getColumnState()
-  const sortFromState = columnStateForSort
-    .filter((col: any) => col.sort)
-    .sort((a: any, b: any) => (a.sortIndex || 0) - (b.sortIndex || 0))
-    .map((col: any) => ({ colId: col.colId, sort: col.sort }))
-  
-  if (sortFromState.length > 0) {
-    sortModel.value = sortFromState
-    setLocalStorage(STORAGE_KEYS.PROJECT_MANAGEMENT_COLUMN_STATE + '_sort', sortFromState)
-  } else {
-    sortModel.value = []
-    setLocalStorage(STORAGE_KEYS.PROJECT_MANAGEMENT_COLUMN_STATE + '_sort', null)
-  }
-}
-
-// ソート変更時の処理
-const onSortChanged = () => {
-  if (!gridRef.value?.api || isInitializing.value) return
-  
-  const columnStateForSort = gridRef.value.api.getColumnState()
-  const sortFromState = columnStateForSort
-    .filter((col: any) => col.sort)
-    .sort((a: any, b: any) => (a.sortIndex || 0) - (b.sortIndex || 0))
-    .map((col: any) => ({ colId: col.colId, sort: col.sort }))
-  
-  if (sortFromState.length > 0) {
-    sortModel.value = sortFromState
-    setLocalStorage(STORAGE_KEYS.PROJECT_MANAGEMENT_COLUMN_STATE + '_sort', sortFromState)
-  } else {
-    sortModel.value = []
-    setLocalStorage(STORAGE_KEYS.PROJECT_MANAGEMENT_COLUMN_STATE + '_sort', null)
-  }
-}
-
-// フィルタ変更時の処理
-const onFilterChanged = () => {
-  if (!gridRef.value?.api || isInitializing.value) return
-  
-  const model = gridRef.value.api.getFilterModel()
-  filterModel.value = model
-  setLocalStorage(STORAGE_KEYS.PROJECT_MANAGEMENT_FILTER_MODEL, Object.keys(model).length > 0 ? model : null)
-}
-
-// ページネーション変更時の処理
-const onPaginationChanged = () => {
-  if (!gridRef.value?.api || isInitializing.value) return
-  
-  let pageSize: number
-  if (typeof gridRef.value.api.paginationGetPageSize === 'function') {
-    pageSize = gridRef.value.api.paginationGetPageSize()
-  } else if (typeof gridRef.value.api.getGridOption === 'function') {
-    pageSize = gridRef.value.api.getGridOption('paginationPageSize') || 50
-  } else {
-    return
-  }
-  
-  if (paginationPageSize.value !== pageSize) {
-    paginationPageSize.value = pageSize
-    setLocalStorage(STORAGE_KEYS.PROJECT_MANAGEMENT_PAGE_SIZE, pageSize)
-  }
-}
-
-// 状態復元フラグ
-let hasRestoredState = false
-let retryCount = 0
-const MAX_RETRY_COUNT = 50
-
-// 状態を復元する関数
-const restoreGridState = () => {
-  if (!gridRef.value || hasRestoredState) return
-  
-  if (retryCount >= MAX_RETRY_COUNT) {
-    isInitializing.value = false
-    return
-  }
-  
-  const api = gridRef.value.api
-  if (!api) {
-    retryCount++
-    setTimeout(() => {
-      if (!hasRestoredState && gridRef.value) {
-        restoreGridState()
-      }
-    }, RESTORE_STATE_TIMEOUTS.INITIAL)
-    return
-  }
-  
-  const hasPaginationMethod = typeof api.paginationSetPageSize === 'function' || 
-                              typeof api.setGridOption === 'function'
-  const hasColumnStateMethod = typeof api.applyColumnState === 'function' || 
-                               typeof api.setGridOption === 'function'
-  const hasFilterMethod = typeof api.setFilterModel === 'function' || 
-                          typeof api.setGridOption === 'function'
-  
-  if (!hasPaginationMethod || !hasColumnStateMethod || !hasFilterMethod) {
-    retryCount++
-    setTimeout(() => {
-      if (!hasRestoredState && gridRef.value) {
-        restoreGridState()
-      }
-    }, RESTORE_STATE_TIMEOUTS.INITIAL)
-    return
-  }
-  
-  isInitializing.value = true
-  retryCount = 0
-  
-  try {
-    // ページサイズを復元
-    const pageSizeValue = paginationPageSize.value
-    if (typeof api.setGridOption === 'function') {
-      api.setGridOption('paginationPageSize', pageSizeValue)
-    }
-    
-    // ソートモデルを復元
-    if (sortModel.value.length > 0) {
-      const sortColumnState = sortModel.value.map((sort: any, index: number) => ({
-        colId: sort.colId,
-        sort: sort.sort,
-        sortIndex: index,
-      }))
-      
-      if (typeof api.applyColumnState === 'function') {
-        api.applyColumnState({ 
-          state: sortColumnState,
-          applyOrder: false
-        })
-      }
-    } else if (columnState.value.length > 0) {
-      const sortFromState = columnState.value
-        .filter((col: any) => col.sort)
-        .sort((a: any, b: any) => (a.sortIndex || 0) - (b.sortIndex || 0))
-        .map((col: any) => ({ 
-          colId: col.colId, 
-          sort: col.sort,
-          sortIndex: col.sortIndex || 0
-        }))
-      
-      if (sortFromState.length > 0 && typeof api.applyColumnState === 'function') {
-        api.applyColumnState({ 
-          state: sortFromState,
-          applyOrder: false
-        })
-      }
-    }
-    
-    // カラム状態を復元（幅や表示/非表示など、ソートは除外）
-    if (columnState.value.length > 0) {
-      if (typeof api.applyColumnState === 'function') {
-        const stateWithoutSort = columnState.value.map((col: any) => ({
-          ...col,
-          sort: undefined,
-          sortIndex: undefined,
-        }))
-        api.applyColumnState({ 
-          state: stateWithoutSort,
-          applyOrder: true
-        })
-      }
-    }
-    
-    // フィルタモデルを復元
-    if (Object.keys(filterModel.value).length > 0) {
-      if (typeof api.setFilterModel === 'function') {
-        api.setFilterModel(filterModel.value)
-      }
-    }
-    
-    hasRestoredState = true
-  } catch (e) {
-    console.error('Error restoring grid state:', e)
-  } finally {
-    setTimeout(() => {
-      isInitializing.value = false
-    }, RESTORE_STATE_TIMEOUTS.COMPLETE)
-  }
-}
-
-// Grid Readyイベントハンドラー
-const onGridReady = () => {
-  if (!hasRestoredState && rowData.value.length > 0) {
-    setTimeout(() => {
-      if (!hasRestoredState) {
-        restoreGridState()
-      }
-    }, 300)
-  }
-}
-
-// 最初のデータレンダリング後の処理
-const onFirstDataRendered = () => {
-  if (!hasRestoredState) {
-    setTimeout(() => {
-      if (!hasRestoredState) {
-        restoreGridState()
-      }
-    }, 500)
-  }
+// Grid Readyイベントハンドラー（最小構成）
+const onGridReady = (params: any) => {
+  console.log('onGridReady')
+  params.api.setGridOption('datasource', createDatasource())
 }
 </script>
 
@@ -490,130 +257,57 @@ const onFirstDataRendered = () => {
 @import '../styles/_theme';
 
 .project-management {
-  padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
 }
 
 .project-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
 
   h2 {
     margin: 0;
-    color: var(--current-textPrimary);
     font-size: 2rem;
     font-weight: 600;
   }
 }
 
 .project-content {
-  background: var(--current-backgroundLight);
-  border-radius: 8px;
-  padding: 2rem;
-  box-shadow: 0 2px 8px var(--current-shadowMd);
+  flex: 1;
+  min-height: 0;
 }
 
-.project-section {
-  margin-bottom: 2rem;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.section-title {
-  margin: 0;
-  color: var(--current-textPrimary);
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.add-project-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1rem;
-  border: 1px solid var(--current-borderColor);
-  border-radius: 4px;
-  background: var(--current-activeBackground);
-  color: var(--current-textWhite);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s;
-
-  &:hover {
-    background: var(--current-linkColor);
-    border-color: var(--current-linkColor);
-  }
-
-  &:active {
-    transform: scale(0.98);
-  }
-
-  .material-symbols-outlined {
-    font-size: 1.25rem;
-  }
-}
-
-.project-list {
-  min-height: 200px;
-}
-
-.empty-message {
-  margin: 0;
-  color: var(--current-textSecondary);
-  font-size: 0.875rem;
-  text-align: center;
-  padding: 2rem 0;
-}
-
-.error-message {
-  background: var(--current-errorBackground);
-  color: var(--current-errorText);
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-  border: 1px solid var(--current-errorBorder);
-}
-
-.loading-message {
-  text-align: center;
-  padding: 2rem;
-  color: var(--current-textSecondary);
-  font-size: 1rem;
-}
-
-.add-project-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.project-grid {
+  height: 100%;
 }
 
 // ボタンセルレンダラーのスタイル
 :deep(.button-cell) {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.375rem;
   align-items: center;
   justify-content: center;
-  padding: 0.25rem;
+  padding: 0.125rem;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
 
   .edit-button,
   .delete-button {
-    padding: 0.375rem 0.75rem;
+    padding: 0.25rem 0.5rem;
     border: 1px solid var(--current-borderColor);
     border-radius: 4px;
     background: var(--current-buttonBackground);
     color: var(--current-textPrimary);
     cursor: pointer;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
+    line-height: 1.2;
     transition: background-color 0.2s, border-color 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: fit-content;
 
     &:hover {
       background: var(--current-buttonHoverBackground);

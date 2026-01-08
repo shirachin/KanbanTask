@@ -10,7 +10,9 @@
   "dependencies": {
     "ag-grid-community": "^32.3.9",
     "ag-grid-vue3": "^32.3.9",
-    "vue": "^3.3.4"
+    "vue": "^3.3.4",
+    "vuetify": "^3.5.0",
+    "@mdi/font": "^7.4.47"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.0",
@@ -18,6 +20,7 @@
     "sass": "^1.69.5",
     "typescript": "^5.9.3",
     "vite": "^5.0.0",
+    "vite-plugin-vuetify": "^2.0.1",
     "vue-tsc": "^3.2.1"
   }
 }
