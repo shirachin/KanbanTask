@@ -15,8 +15,12 @@ ENV NO_PROXY=${NO_PROXY}
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# uvをインストール
+RUN pip install --no-cache-dir uv
+
+# pyproject.tomlをコピーしてuvで依存関係をインストール
+COPY pyproject.toml .
+RUN uv pip install --system -e .
 
 COPY . .
 

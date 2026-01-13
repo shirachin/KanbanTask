@@ -88,6 +88,26 @@ export const useTasks = () => {
     }
   }
 
+  // タスクの順番を更新
+  const updateTaskOrder = async (id: number, newOrder: number) => {
+    loading.value = true
+    error.value = null
+    try {
+      const data = await apiPut<Task>(`/api/v1/tasks/${id}/order?new_order=${newOrder}`, {})
+      const index = tasks.value.findIndex((t: Task) => t.id === id)
+      if (index !== -1) {
+        tasks.value[index] = data
+      }
+      return data
+    } catch (e) {
+      error.value = handleApiError(e, 'タスクの順番更新に失敗しました')
+      console.error('Error updating task order:', e)
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   // タスクを削除
   const deleteTask = async (id: number) => {
     loading.value = true
@@ -111,6 +131,7 @@ export const useTasks = () => {
     fetchTasks,
     createTask,
     updateTask,
+    updateTaskOrder,
     deleteTask,
   }
 }

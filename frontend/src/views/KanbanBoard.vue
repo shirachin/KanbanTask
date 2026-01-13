@@ -91,61 +91,30 @@
           <h3 class="column-title" :style="{ borderBottomColor: status.color }">
             {{ status.display_name }}
           </h3>
-          <div class="task-list">
-            <div 
-              v-for="task in getTasksByStatus(status.id)" 
-              :key="task.id" 
-              class="task-card"
-              @click="openTaskEditModal(task)"
-            >
-              <div class="task-title">{{ task.title }}</div>
-              <div v-if="task.description" class="task-description">{{ task.description }}</div>
-              
-              <!-- TODOリスト -->
-              <div class="task-todos">
-                <div 
-                  v-for="todo in getTodosForTask(task.id)" 
-                  :key="todo.id" 
-                  class="todo-item"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="todo.completed"
-                    disabled
-                    class="todo-checkbox"
-                    title="完了状態は実行完了日で自動管理されます"
-                  />
-                  <span 
-                    class="todo-title"
-                    :class="{ 'todo-completed': todo.completed }"
-                  >
-                    {{ todo.title }}
-                  </span>
-                  <button
-                    type="button"
-                    class="todo-delete-button"
-                    @click.stop.prevent="deleteTodoItem(todo.id)"
-                    title="削除"
-                  >
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
-                </div>
-                <div class="todo-add-container">
-                  <input
-                    v-model="newTodoTexts[task.id]"
-                    @keyup.enter="addTodo(task.id)"
-                    @blur="handleTodoBlur(task.id)"
-                    @click.stop
-                    type="text"
-                    class="todo-add-input"
-                    placeholder="+ TODOを追加"
-                  />
-                </div>
+          <VueDraggable
+            v-if="tasksByStatusMap[status.id] !== undefined"
+            v-model="tasksByStatusMap[status.id]"
+            :group="{ name: 'kanban-tasks', pull: true, put: true }"
+            :animation="150"
+            ghost-class="sortable-ghost"
+            chosen-class="sortable-chosen"
+            drag-class="sortable-drag"
+            item-key="id"
+            class="task-list"
+            :data-status-id="status.id"
+            @end="(evt) => handleDragEnd(evt, status.id)"
+          >
+            <template #item="{ element }">
+              <div class="task-card" :data-task-id="element.id">
+                <div class="task-title">{{ element.title }}</div>
               </div>
-              
-              <div class="task-project">{{ getProjectName(task.project_id) }}</div>
-            </div>
-            <p v-if="getTasksByStatus(status.id).length === 0" class="empty-message">タスクがありません</p>
+            </template>
+            <template #footer>
+              <p v-if="tasksByStatusMap[status.id] && tasksByStatusMap[status.id].length === 0" class="empty-message">タスクがありません</p>
+            </template>
+          </VueDraggable>
+          <div v-else class="task-list" :data-status-id="status.id">
+            <p class="empty-message">読み込み中...</p>
           </div>
         </div>
       </div>
@@ -157,26 +126,17 @@
       :current-user="currentUser"
       @save="handleTaskSave"
     />
-    
-    <TaskEditModal
-      v-model:show="showTaskEditModal"
-      :task="editingTask"
-      :projects="myProjects"
-      :current-user="currentUser"
-      @save="handleTaskUpdate"
-      @delete="handleTaskDelete"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { VueDraggable } from 'vue-draggable-plus'
 import { useProjects, type Project } from '../composables/useProjects'
 import { useTasks, type Task } from '../composables/useTasks'
 import { useTodos, type Todo } from '../composables/useTodos'
 import { useStatuses, type Status } from '../composables/useStatuses'
 import TaskCreateModal from '../components/TaskCreateModal.vue'
-import TaskEditModal from '../components/TaskEditModal.vue'
 import { DEFAULT_PERSONAL_STATUSES } from '../constants/statuses'
 import { apiGet } from '../utils/apiClient'
 
@@ -203,14 +163,15 @@ const selectedProjectIndex = ref<number>(-1)
 const selectedProjectName = ref<string>('')
 
 const { projects, loading: projectsLoading, error: projectsError, fetchProjects } = useProjects()
-const { tasks, loading: tasksLoading, error: tasksError, fetchTasks, createTask, updateTask } = useTasks()
+const { tasks, loading: tasksLoading, error: tasksError, fetchTasks, createTask, updateTask, updateTaskOrder } = useTasks()
 const { fetchTodos, createTodo, deleteTodo, getTodos } = useTodos()
 const { statuses: statusesData, fetchStatuses: fetchStatusesData } = useStatuses()
 
 const showTaskModal = ref(false)
-const showTaskEditModal = ref(false)
-const editingTask = ref<Task | null>(null)
-const newTodoTexts = ref<Record<number, string>>({})
+
+// 各ステータスのタスクリストを管理（Draggable用）
+const tasksByStatusMap = ref<Record<number, Task[]>>({})
+
 
 const loading = computed(() => projectsLoading.value || tasksLoading.value)
 const error = computed(() => projectsError.value || tasksError.value)
@@ -298,131 +259,66 @@ const fetchAssigneesForProject = async (projectId: number) => {
   }
 }
 
-// プロジェクト名を取得
-const getProjectName = (projectId: number): string => {
-  if (projectId === -1) {
-    return '個人タスク'
-  }
-  const project = projects.value.find((p: Project) => p.id === projectId)
-  return project ? project.name : '不明'
-}
-
-// タスクのTODOリストを取得
-const getTodosForTask = (taskId: number): Todo[] => {
-  return getTodos(taskId)
-}
-
-// TODOを追加
-const addTodo = async (taskId: number) => {
-  const text = newTodoTexts.value[taskId]?.trim()
-  if (!text) {
-    return
-  }
-  
-  try {
-    await createTodo(taskId, text)
-    newTodoTexts.value[taskId] = ''
-  } catch (e) {
-    console.error('Error adding todo:', e)
-  }
-}
-
-// TODO入力フィールドのblur処理
-const handleTodoBlur = (taskId: number) => {
-  // blur時は空の場合は何もしない（Enterキーでの追加のみ）
-  const text = newTodoTexts.value[taskId]?.trim()
-  if (!text) {
-    delete newTodoTexts.value[taskId]
-  }
-}
 
 
-// TODOを削除
-const deleteTodoItem = async (todoId: number) => {
-  if (!confirm('このTODOを削除しますか？')) {
-    return
-  }
-  
-  try {
-    await deleteTodo(todoId)
-  } catch (e) {
-    console.error('Error deleting todo:', e)
-  }
-}
-
-// タスク編集モーダルを開く
-const openTaskEditModal = (task: Task) => {
-  editingTask.value = task
-  showTaskEditModal.value = true
-}
-
-// タスク更新処理
-const handleTaskUpdate = async (taskData: {
-  id: number
-  project_id: number
-  title: string
-  description?: string | null
-  status: string
-  assignee?: string | null
-}) => {
-  try {
-    // ステータスIDを取得（共通ステータスから取得）
-    let statusId: number | null = null
-    const statusesList = statusesData.value || []
-    const status = statusesList.find((s: Status) => s.name === taskData.status)
-    if (status) {
-      statusId = status.id
-    }
-    
-    await updateTask(taskData.id, {
-      title: taskData.title,
-      description: taskData.description,
-      status: taskData.status,
-      status_id: statusId,
-      assignee: taskData.assignee,
-    })
-    
-    // タスクを再読み込み
-    await loadTasks()
-  } catch (e) {
-    console.error('Error updating task:', e)
-    alert('タスクの更新に失敗しました')
-  }
-}
-
-// タスク削除処理
-const handleTaskDelete = async (taskId: number) => {
-  try {
-    // タスクを再読み込み（削除はTaskEditModal内で実行済み）
-    await loadTasks()
-  } catch (e) {
-    console.error('Error reloading tasks after deletion:', e)
-  }
-}
-
-// ステータスIDでタスクを取得（個人タスクの場合はstatus名でマッチング）
+// ステータスIDでタスクを取得（orderでソート）
 const getTasksByStatus = (statusId: number): Task[] => {
-  // 個人タスク用の仮想ステータスID（負の値）の場合は、status名でマッチング
-  if (statusId < 0) {
-    const statusNameMap: { [key: number]: string } = {
-      [-1]: 'considering',
-      [-2]: 'not_started',
-      [-3]: 'in_progress',
-      [-4]: 'review_pending',
-      [-5]: 'staging_deployed',
-      [-6]: 'production_deployed',
-      [-7]: 'cancelled'
-    }
-    const statusName = statusNameMap[statusId]
-    if (statusName) {
-      return tasks.value.filter((task: Task) => {
-        return task.project_id === -1 && task.status === statusName
-      })
-    }
+  // ステータスオブジェクトを取得
+  const status = statuses.value.find((s: Status) => s.id === statusId)
+  if (!status) {
+    return []
   }
-  return tasks.value.filter((task: Task) => {
-    return task.status_id === statusId
+  
+  const filteredTasks = tasks.value.filter((task: Task) => {
+    // status_idが一致する場合
+    if (task.status_id === statusId) {
+      return true
+    }
+    // status_idがnullまたは0の場合、status名でマッチング（フォールバック）
+    if ((task.status_id === null || task.status_id === 0) && task.status === status.name) {
+      return true
+    }
+    // 日本語のstatus名とのマッピング（後方互換性のため）
+    const statusNameMap: { [key: string]: string } = {
+      '未着手': 'not_started',
+      '検討中': 'considering',
+      '実行中': 'in_progress',
+      'レビュー待ち': 'review_pending',
+      '検証環境反映済み': 'staging_deployed',
+      '本番環境反映済み': 'production_deployed',
+      '中止': 'cancelled'
+    }
+    const mappedStatusName = statusNameMap[task.status] || task.status
+    if (mappedStatusName === status.name) {
+      return true
+    }
+    return false
   })
+  
+  // orderでソート
+  return filteredTasks.sort((a: Task, b: Task) => {
+    return (a.order || 0) - (b.order || 0)
+  })
+}
+
+// ステータスごとのタスクリストを更新
+const updateTasksByStatus = () => {
+  console.log('updateTasksByStatus called', {
+    statusesCount: statuses.value.length,
+    tasksCount: tasks.value.length,
+    statuses: statuses.value.map(s => ({ id: s.id, name: s.name })),
+    tasks: tasks.value.map(t => ({ id: t.id, status_id: t.status_id, status: t.status }))
+  })
+  if (statuses.value.length === 0) {
+    console.warn('updateTasksByStatus: statuses is empty')
+    return
+  }
+  statuses.value.forEach((status: Status) => {
+    const tasks = getTasksByStatus(status.id)
+    tasksByStatusMap.value[status.id] = tasks || []
+    console.log(`Status ${status.id} (${status.name}): ${tasks.length} tasks`, tasks.map(t => t.id))
+  })
+  console.log('tasksByStatusMap after update:', tasksByStatusMap.value)
 }
 
 // 個人タスク用のプロジェクト取得は不要（project_id=-1で扱う）
@@ -571,17 +467,14 @@ const loadTasks = async () => {
       await fetchTasks(undefined, displayProjectIds.value, assignee)
     }
     
-    // 各タスクのTODOを取得
-    for (const task of tasks.value) {
-      try {
-        await fetchTodos(task.id)
-      } catch (e) {
-        console.error(`Error fetching todos for task ${task.id}:`, e)
-      }
-    }
-    
     // ステータスを取得（共通ステータスを取得）
     await fetchStatuses()
+    
+    // タスク読み込み後、ステータスごとのタスクリストを更新
+    // ステータスが読み込まれた後に更新する
+    if (statuses.value.length > 0) {
+      updateTasksByStatus()
+    }
     
   } catch (e) {
     console.error('Error in loadTasks:', e)
@@ -607,7 +500,99 @@ onMounted(async () => {
   
   // タスクを読み込む（個人タスクはproject_id=-1で扱う）
   await loadTasks()
+  
+  // ステータスごとのタスクリストを更新
+  // ステータスが読み込まれた後に更新する
+  if (statuses.value.length > 0) {
+    updateTasksByStatus()
+  }
 })
+
+// ドラッグ終了時の処理
+const handleDragEnd = (evt: { from: HTMLElement, to: HTMLElement, oldIndex: number, newIndex: number }, toStatusId: number) => {
+  if (evt.oldIndex === undefined || evt.newIndex === undefined) return
+  
+  // 移動元のステータスIDを取得
+  const fromStatusId = evt.from ? parseInt(evt.from.getAttribute('data-status-id') || '0') : 0
+  
+  // 移動したタスクを特定（移動元のリストから取得）
+  let movedTask: Task | null = null
+  if (fromStatusId && tasksByStatusMap.value[fromStatusId]) {
+    const fromTasks = tasksByStatusMap.value[fromStatusId]
+    if (evt.oldIndex >= 0 && evt.oldIndex < fromTasks.length) {
+      movedTask = fromTasks[evt.oldIndex]
+    }
+  }
+  
+  // 移動先のリストから取得（v-modelで既に更新されているため）
+  if (!movedTask && tasksByStatusMap.value[toStatusId]) {
+    const toTasks = tasksByStatusMap.value[toStatusId]
+    if (evt.newIndex >= 0 && evt.newIndex < toTasks.length) {
+      movedTask = toTasks[evt.newIndex]
+    }
+  }
+  
+  if (!movedTask) return
+  
+  const taskId = movedTask.id
+  
+  // ステータスオブジェクトを取得
+  const newStatus = statuses.value.find((s: Status) => s.id === toStatusId)
+  if (!newStatus) return
+  
+  // 同一ステータス内での移動の場合は、orderを更新
+  if (fromStatusId === toStatusId) {
+    // 同一ステータス内での順番変更
+    const newOrder = evt.newIndex
+    handleTaskOrderChange(taskId, toStatusId, newOrder)
+  } else {
+    // ステータスが変更された場合
+    handleTaskStatusChange(taskId, newStatus.name, toStatusId)
+  }
+}
+
+// タスクのステータス変更処理
+const handleTaskStatusChange = async (taskId: number, newStatusName: string, newStatusId: number) => {
+  try {
+    await updateTask(taskId, {
+      status: newStatusName,
+      status_id: newStatusId,
+    })
+    
+    // タスクを再読み込み
+    await loadTasks()
+    
+    // ステータスごとのタスクリストを更新
+    updateTasksByStatus()
+  } catch (e) {
+    console.error('Error updating task status:', e)
+    alert('タスクのステータス更新に失敗しました')
+    // エラー時はタスクを再読み込みして元に戻す
+    await loadTasks()
+    updateTasksByStatus()
+  }
+}
+
+// タスクの順番変更処理
+const handleTaskOrderChange = async (taskId: number, statusId: number, newOrder: number) => {
+  try {
+    // バックエンドAPIで順番を更新（同じステータス内のすべてのタスクのorderを適切に調整）
+    await updateTaskOrder(taskId, newOrder)
+    
+    // タスクを再読み込み
+    await loadTasks()
+    
+    // ステータスごとのタスクリストを更新
+    updateTasksByStatus()
+  } catch (e) {
+    console.error('Error updating task order:', e)
+    alert('タスクの順番更新に失敗しました')
+    // エラー時はタスクを再読み込みして元に戻す
+    await loadTasks()
+    updateTasksByStatus()
+  }
+}
+
 
 // タスク保存処理
 const handleTaskSave = async (taskData: {
@@ -656,26 +641,36 @@ watch([selectedProjectMode, selectedProjectId, displayProjectIds], () => {
   // LocalStorageに保存（watch内で更新することで、プログラム的な変更も反映）
   setLocalStorage(STORAGE_KEYS.KANBAN_PROJECT_MODE, selectedProjectMode.value)
   setLocalStorage(STORAGE_KEYS.KANBAN_PROJECT_ID, selectedProjectId.value)
-  loadTasks()
+  loadTasks().then(() => {
+    updateTasksByStatus()
+  })
 })
+
+// タスクが変更されたら、ステータスごとのタスクリストを更新
+watch(tasks, () => {
+  updateTasksByStatus()
+}, { deep: true })
 </script>
 
 <style lang="scss" scoped>
 @import '../styles/_theme';
 
 .kanban-board {
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  box-sizing: border-box;
 }
 
 .kanban-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
+  flex-shrink: 0;
 
   h2 {
     margin: 0;
@@ -862,9 +857,10 @@ watch([selectedProjectMode, selectedProjectId, displayProjectIds], () => {
 }
 
 .kanban-content {
+  flex: 1;
   overflow-x: auto;
-  overflow-y: visible;
-  height: 100%;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .kanban-columns {
@@ -880,6 +876,10 @@ watch([selectedProjectMode, selectedProjectId, displayProjectIds], () => {
   border-radius: 8px;
   padding: 1.5rem;
   box-shadow: 0 2px 8px var(--current-shadowMd);
+  display: flex;
+  flex-direction: column;
+  min-height: fit-content;
+  box-sizing: border-box;
 }
 
 .column-title {
@@ -892,153 +892,51 @@ watch([selectedProjectMode, selectedProjectId, displayProjectIds], () => {
 }
 
 .task-list {
+  flex: 1;
   min-height: 200px;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .task-card {
   background: var(--current-backgroundGray);
   border-radius: 6px;
   padding: 1rem;
-  cursor: pointer;
+  cursor: grab;
   transition: transform 0.2s, box-shadow 0.2s;
   border: 1px solid var(--current-borderColor);
+  user-select: none;
 
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px var(--current-shadowMd);
+  }
+  
+  &:active {
+    cursor: grabbing;
   }
 }
 
 .task-title {
   font-weight: 600;
   color: var(--current-textPrimary);
-  margin-bottom: 0.5rem;
   font-size: 0.9375rem;
-}
-
-.task-description {
-  color: var(--current-textSecondary);
-  font-size: 0.875rem;
-  margin-bottom: 0.5rem;
-  line-height: 1.4;
-}
-
-.task-todos {
-  margin: 0.75rem 0;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--current-borderColor);
-}
-
-.todo-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-  padding: 0.25rem 0;
-  
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
-
-.todo-checkbox {
-  cursor: pointer;
-  width: 1rem;
-  height: 1rem;
-  flex-shrink: 0;
-}
-
-.todo-title {
-  flex: 1;
-  font-size: 0.875rem;
-  color: var(--current-textPrimary);
   word-break: break-word;
-  
-  &.todo-completed {
-    text-decoration: line-through;
-    color: var(--current-textSecondary);
-    opacity: 0.7;
-  }
 }
 
-.todo-delete-button {
-  background: none;
-  border: none;
-  color: var(--current-textSecondary);
-  cursor: pointer;
-  padding: 0.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: background-color 0.2s, color 0.2s;
-  flex-shrink: 0;
-  opacity: 0;
-  
-  .task-card:hover & {
-    opacity: 1;
-  }
-  
-  &:hover {
-    background: var(--current-backgroundGray);
-    color: var(--current-errorColor);
-  }
-  
-  .material-symbols-outlined {
-    font-size: 1rem;
-  }
+.sortable-ghost {
+  opacity: 0.4;
 }
 
-.task-card {
-  cursor: pointer;
-  
-  // TODO関連の要素はクリックイベントを伝播させない
-  .task-todos,
-  .todo-item,
-  .todo-add-container {
-    pointer-events: auto;
-  }
-  
-  .todo-delete-button {
-    pointer-events: auto;
-  }
+.sortable-chosen {
+  cursor: grabbing;
 }
 
-.todo-add-container {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--current-borderColor);
-}
-
-.todo-add-input {
-  width: 100%;
-  padding: 0.375rem 0.5rem;
-  border: 1px solid var(--current-borderColor);
-  border-radius: 4px;
-  background: var(--current-backgroundLight);
-  color: var(--current-textPrimary);
-  font-size: 0.875rem;
-  transition: border-color 0.2s;
-  
-  &:focus {
-    outline: none;
-    border-color: var(--current-linkColor);
-  }
-  
-  &::placeholder {
-    color: var(--current-textSecondary);
-  }
-}
-
-.task-project {
-  color: var(--current-textSecondary);
-  font-size: 0.75rem;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--current-borderColor);
+.sortable-drag {
+  opacity: 0.8;
 }
 
 .empty-message {

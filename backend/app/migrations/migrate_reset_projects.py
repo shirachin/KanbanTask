@@ -1,7 +1,9 @@
 """
 既存のプロジェクトをすべて削除し、新しいテストプロジェクトを登録するマイグレーション
 """
+
 from sqlalchemy import text
+
 from app.core.database import engine
 
 # 新しいテストプロジェクトのリスト
@@ -72,6 +74,7 @@ NEW_PROJECTS = [
     "【28/4Q】プロジェクトD",
 ]
 
+
 def migrate():
     with engine.connect() as conn:
         trans = conn.begin()
@@ -80,21 +83,27 @@ def migrate():
             # まず、関連するタスクとステータスを削除（CASCADEで自動削除されるが、明示的に削除）
             print("既存のプロジェクトを削除中...")
             conn.execute(text("DELETE FROM projects WHERE id != -1"))
-            
+
             # 2. 新しいプロジェクトを登録
             print(f"{len(NEW_PROJECTS)}個の新しいプロジェクトを登録中...")
             for project_name in NEW_PROJECTS:
-                conn.execute(text("""
+                conn.execute(
+                    text("""
                     INSERT INTO projects (name, description, start_month, end_month, assignee, created_at)
                     VALUES (:name, NULL, NULL, NULL, NULL, NOW())
-                """), {"name": project_name})
-            
+                """),
+                    {"name": project_name},
+                )
+
             trans.commit()
-            print(f"マイグレーションが完了しました。{len(NEW_PROJECTS)}個のプロジェクトを登録しました。")
+            print(
+                f"マイグレーションが完了しました。{len(NEW_PROJECTS)}個のプロジェクトを登録しました。"
+            )
         except Exception as e:
             trans.rollback()
             print(f"マイグレーションエラー: {e}")
             raise
+
 
 if __name__ == "__main__":
     migrate()

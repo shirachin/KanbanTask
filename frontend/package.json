@@ -8,11 +8,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mdi/font": "^7.4.47",
     "ag-grid-community": "^32.3.9",
     "ag-grid-vue3": "^32.3.9",
+    "sortablejs": "^1.15.6",
+    "swapy": "^1.0.5",
     "vue": "^3.3.4",
-    "vuetify": "^3.5.0",
-    "@mdi/font": "^7.4.47"
+    "vue-draggable-plus": "^0.6.0",
+    "vuetify": "^3.5.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.0",

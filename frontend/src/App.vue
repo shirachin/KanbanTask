@@ -1,24 +1,24 @@
 <template>
   <v-app class="app-no-scroll">
-    <Login v-if="!hasUser" />
+  <Login v-if="!hasUser" />
     <div v-else class="layout" :class="{ 'nav-collapsed': !navOpen }">
-      <header class="header">
+    <header class="header">
         <v-toolbar density="compact" color="primary" flat>
           <v-btn
             :icon="navOpen ? 'mdi-menu-open' : 'mdi-menu'"
             variant="text"
-            @click="toggleNav"
+          @click="toggleNav"
           />
           <v-toolbar-title>
             <div class="d-flex align-center">
               <div class="header-icon mr-2" v-html="iconSvg"></div>
               <span>タスク管理アプリ</span>
-            </div>
+        </div>
           </v-toolbar-title>
           <v-spacer />
-          <ThemeSelector />
+        <ThemeSelector />
         </v-toolbar>
-      </header>
+    </header>
 
       <aside class="nav">
         <div class="pane">
@@ -47,7 +47,7 @@
               :active="currentView === 'gantt'"
               disabled
               @click="switchView('gantt')"
-            >
+          >
               <template v-slot:append>
                 <v-chip size="x-small" color="grey">未実装</v-chip>
               </template>
@@ -89,19 +89,19 @@
         </div>
       </aside>
 
-      <main class="main">
+    <main class="main">
         <div class="pane">
-          <Dashboard v-if="currentView === 'dashboard'" />
-          <KanbanBoard v-else-if="currentView === 'kanban'" />
-          <TodoList v-else-if="currentView === 'todo'" />
-          <GanttChart v-else-if="currentView === 'gantt'" />
-          <ProjectManagement v-else-if="currentView === 'project'" />
-          <Changelog v-else-if="currentView === 'changelog'" />
-          <Help v-else-if="currentView === 'help'" />
+      <Dashboard v-if="currentView === 'dashboard'" />
+      <KanbanBoard v-else-if="currentView === 'kanban'" />
+      <TodoList v-else-if="currentView === 'todo'" />
+      <GanttChart v-else-if="currentView === 'gantt'" />
+      <ProjectManagement v-else-if="currentView === 'project'" />
+      <Changelog v-else-if="currentView === 'changelog'" />
+      <Help v-else-if="currentView === 'help'" />
         </div>
-      </main>
+    </main>
 
-      <footer class="footer">
+    <footer class="footer">
         <div class="status">
           <v-btn
             variant="text"
@@ -115,8 +115,8 @@
           <v-spacer />
           <span class="text-caption font-monospace px-2">{{ currentTime }}</span>
         </div>
-      </footer>
-    </div>
+    </footer>
+  </div>
   </v-app>
 </template>
 
@@ -291,14 +291,14 @@ watch(currentView, (newView: ViewType) => {
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-}
+    }
 
 .nav .pane {
   // ナビゲーションのフッターを下部に固定
   .nav-footer {
     margin-top: auto;
   }
-}
+    }
 
 .main .pane {
   padding: 1rem;
@@ -308,8 +308,8 @@ watch(currentView, (newView: ViewType) => {
 /* status bar っぽく */
 .status {
   height: 100%;
-  display: flex;
-  align-items: center;
+    display: flex;
+    align-items: center;
   padding: 0;
   width: 100%;
   justify-content: space-between;
@@ -325,25 +325,25 @@ watch(currentView, (newView: ViewType) => {
   font-feature-settings: normal;
   font-variant: normal;
   unicode-bidi: normal;
-}
+  }
 
-.header-icon {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  .header-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   color: inherit;
-  
-  :deep(svg) {
-    width: 100%;
-    height: 100%;
-  }
-  
-  :deep(.st0) {
-    fill: currentColor;
-  }
+    
+    :deep(svg) {
+      width: 100%;
+      height: 100%;
+    }
+    
+    :deep(.st0) {
+      fill: currentColor;
+    }
 }
 
 .user-menu-item {

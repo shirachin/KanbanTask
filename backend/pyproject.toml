@@ -1,0 +1,46 @@
+[project]
+name = "taskapp-backend"
+version = "0.1.0"
+description = "Task Management API Backend"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.104.1",
+    "uvicorn[standard]==0.24.0",
+    "sqlalchemy==2.0.23",
+    "psycopg2-binary==2.9.9",
+    "pydantic==2.5.0",
+    "python-dotenv==1.0.0",
+    "alembic==1.12.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults (FastAPI Depends pattern)
+]
+exclude = [
+    "**/migrations/**",  # exclude migration files
+    "app/migrations/**",  # exclude migration files
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]

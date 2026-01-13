@@ -1,8 +1,11 @@
 """
 タスクテーブルにassigneeフィールドを追加するマイグレーション
 """
+
 from sqlalchemy import text
+
 from app.core.database import engine
+
 
 def migrate():
     with engine.connect() as conn:
@@ -14,6 +17,7 @@ def migrate():
         except Exception as e:
             print(f"assigneeカラム追加エラー（無視可能）: {e}")
             conn.rollback()
+
 
 if __name__ == "__main__":
     migrate()

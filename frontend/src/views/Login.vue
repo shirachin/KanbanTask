@@ -11,14 +11,14 @@
           </v-card-subtitle>
           <v-form @submit.prevent="handleLogin">
             <v-text-field
-              v-model="username"
+            v-model="username"
               label="ユーザー名"
-              placeholder="ユーザー名を入力（半角英数字のみ）"
+            placeholder="ユーザー名を入力（半角英数字のみ）"
               :rules="[rules.required, rules.alphanumeric]"
-              autofocus
-              @input="handleInput"
+            autofocus
+            @input="handleInput"
               class="mb-4"
-            />
+          />
             <v-btn
               type="submit"
               color="primary"

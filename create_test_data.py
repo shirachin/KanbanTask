@@ -9,7 +9,7 @@ from datetime import datetime, date, timedelta
 
 API_URL = "http://localhost:8001"
 
-def create_task(title: str, project_id: int = -1, assignee: str = "test_user", description: str = None):
+def create_task(title: str, project_id: int = -1, assignee: str = "h73440", description: str = None):
     """タスクを作成"""
     url = f"{API_URL}/api/v1/tasks"
     data = {

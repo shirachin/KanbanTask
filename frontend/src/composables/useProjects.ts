@@ -95,11 +95,11 @@ export const useProjects = () => {
     error.value = null
     try {
       const data = await apiPost<any>('/api/v1/projects', {
-        name: project.name,
-        start_month: project.startMonth || null,
-        end_month: project.endMonth || null,
-        assignee: project.assignee || [],
-        description: project.description || null,
+          name: project.name,
+          start_month: project.startMonth || null,
+          end_month: project.endMonth || null,
+          assignee: project.assignee || [],
+          description: project.description || null,
       })
       // バックエンドの形式からフロントエンドの形式に変換
       const newProject: Project = {
@@ -129,11 +129,11 @@ export const useProjects = () => {
     error.value = null
     try {
       const data = await apiPut<any>(`/api/v1/projects/${id}`, {
-        name: project.name,
-        start_month: project.startMonth !== undefined ? project.startMonth : null,
-        end_month: project.endMonth !== undefined ? project.endMonth : null,
-        assignee: project.assignee || [],
-        description: project.description || null,
+          name: project.name,
+          start_month: project.startMonth !== undefined ? project.startMonth : null,
+          end_month: project.endMonth !== undefined ? project.endMonth : null,
+          assignee: project.assignee || [],
+          description: project.description || null,
       })
       // バックエンドの形式からフロントエンドの形式に変換
       const updatedProject: Project = {

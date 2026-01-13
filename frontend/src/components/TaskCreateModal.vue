@@ -40,7 +40,7 @@
             placeholder="タスク名を入力"
             class="mb-4"
           />
-
+        
           <v-textarea
             v-model="formData.description"
             label="詳細"
@@ -79,7 +79,7 @@
       </v-card-text>
 
       <v-divider />
-
+      
       <v-card-actions>
         <v-spacer />
         <v-btn

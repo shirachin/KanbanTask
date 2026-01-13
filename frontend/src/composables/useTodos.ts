@@ -63,10 +63,10 @@ export const useTodos = () => {
     error.value = null
     try {
       const data = await apiPost<Todo>(`/api/v1/tasks/${taskId}/todos`, {
-        task_id: taskId,
-        title: title,
-        completed: false,
-        order: 0,
+          task_id: taskId,
+          title: title,
+          completed: false,
+          order: 0,
       })
       const taskTodos = todos.value.get(taskId) || []
       taskTodos.push(data)

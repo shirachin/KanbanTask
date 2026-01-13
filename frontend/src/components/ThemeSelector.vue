@@ -7,22 +7,22 @@
           icon
           variant="text"
           size="small"
-          :aria-label="`テーマを選択: ${selectedTheme}`"
-        >
+      :aria-label="`テーマを選択: ${selectedTheme}`"
+    >
           <v-icon>mdi-palette</v-icon>
         </v-btn>
       </template>
       <v-list>
         <v-list-item
-          v-for="themeName in availableThemes"
-          :key="themeName"
+        v-for="themeName in availableThemes"
+        :key="themeName"
           :active="selectedTheme === themeName"
-          @click="selectTheme(themeName)"
-        >
+        @click="selectTheme(themeName)"
+      >
           <template v-slot:prepend>
             <div
-              class="theme-swatch"
-              :style="{ background: getThemeColor(themeName) }"
+          class="theme-swatch"
+          :style="{ background: getThemeColor(themeName) }"
             ></div>
           </template>
           <v-list-item-title>{{ getThemeDisplayName(themeName) }}</v-list-item-title>
@@ -123,14 +123,14 @@ onMounted(() => {
 .theme-selector {
   display: flex;
   align-items: center;
-}
+    }
 
-.theme-swatch {
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  border: 1px solid var(--current-swatchBorderColor);
-  flex-shrink: 0;
+    .theme-swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 1px solid var(--current-swatchBorderColor);
+      flex-shrink: 0;
   margin-right: 8px;
 }
 </style>

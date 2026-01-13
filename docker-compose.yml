@@ -79,3 +79,56 @@ services:
     networks:
       - taskapp_network
 
+  # フォーマット用サービス（ruff formatを実行）
+  format:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,.local}
+    container_name: taskapp_format
+    volumes:
+      - ./backend:/app
+    command: uvx ruff format .
+    networks:
+      - taskapp_network
+    profiles:
+      - tools
+
+  # リント用サービス（ruff checkを実行）
+  lint:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,.local}
+    container_name: taskapp_lint
+    volumes:
+      - ./backend:/app
+    command: uvx ruff check .
+    networks:
+      - taskapp_network
+    profiles:
+      - tools
+
+  # チェック用サービス（フォーマットチェックとリントチェックの両方を実行）
+  check:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,.local}
+    container_name: taskapp_check
+    volumes:
+      - ./backend:/app
+    command: sh -c "uvx ruff format --check . && uvx ruff check ."
+    networks:
+      - taskapp_network
+    profiles:
+      - tools

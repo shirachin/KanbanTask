@@ -1,0 +1,49 @@
+name: Code Quality Check
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**/*.py'
+      - 'backend/pyproject.toml'
+      - '.github/workflows/format.yml'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/**/*.py'
+      - 'backend/pyproject.toml'
+      - '.github/workflows/format.yml'
+
+jobs:
+  ruff-check:
+    runs-on: ubuntu-latest
+    name: Check code formatting and linting with ruff
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        run: |
+          docker build \
+            -t taskapp-backend:check \
+            -f backend/Dockerfile \
+            backend/
+
+      - name: Check formatting
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/backend:/app" \
+            taskapp-backend:check \
+            uvx ruff format --check .
+
+      - name: Check linting
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/backend:/app" \
+            taskapp-backend:check \
+            uvx ruff check .

@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
-from sqlalchemy.sql import func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.core.database import Base
+
 
 class Project(Base):
     __tablename__ = "projects"
@@ -14,9 +16,12 @@ class Project(Base):
     assignee = Column(String, nullable=True)  # JSON配列として保存（カンマ区切りまたはJSON）
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
-    statuses = relationship("Status", back_populates="project")  # cascadeを削除（共通ステータスは削除しない）
+    statuses = relationship(
+        "Status", back_populates="project"
+    )  # cascadeを削除（共通ステータスは削除しない）
+
 
 class Status(Base):
     __tablename__ = "statuses"
@@ -26,11 +31,14 @@ class Status(Base):
     display_name = Column(String, nullable=False)
     order = Column(Integer, default=0)
     color = Column(String, default="#667eea")
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)  # 共通ステータスの場合はNULL
+    project_id = Column(
+        Integer, ForeignKey("projects.id"), nullable=True
+    )  # 共通ステータスの場合はNULL
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     project = relationship("Project", back_populates="statuses")
     tasks = relationship("Task", back_populates="status_obj")
+
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -46,10 +54,13 @@ class Task(Base):
     completed = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     project = relationship("Project", back_populates="tasks")
     status_obj = relationship("Status", back_populates="tasks")
-    todos = relationship("Todo", back_populates="task", cascade="all, delete-orphan", order_by="Todo.order")
+    todos = relationship(
+        "Todo", back_populates="task", cascade="all, delete-orphan", order_by="Todo.order"
+    )
+
 
 class Todo(Base):
     __tablename__ = "todos"
@@ -63,5 +74,5 @@ class Todo(Base):
     completed_date = Column(DateTime(timezone=True), nullable=True)  # 実行完了日
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     task = relationship("Task", back_populates="todos")

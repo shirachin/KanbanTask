@@ -167,6 +167,41 @@ taskapp/
 
 バックエンドのコードを変更すると、自動的にリロードされます（ホットリロード有効）。
 
+#### コードフォーマットとリント
+
+このプロジェクトでは、`uv`で依存関係を管理し、`uvx ruff`でruffを実行してコードフォーマットとリントを行います。
+
+**Dockerコンテナ内で実行**:
+
+```bash
+# フォーマットを実行（コードを自動修正）
+docker compose --profile tools run --rm format
+
+# リントを実行（エラーを表示）
+docker compose --profile tools run --rm lint
+
+# フォーマットチェックとリントチェックの両方を実行（CI用）
+docker compose --profile tools run --rm check
+
+# または、backendコンテナ内で直接実行
+docker compose exec backend uvx ruff format .        # フォーマット実行
+docker compose exec backend uvx ruff format --check . # フォーマットチェック
+docker compose exec backend uvx ruff check .         # リントチェック
+```
+
+**ローカル環境で実行する場合**:
+
+```bash
+# uvをインストール
+pip install uv
+
+# フォーマットとリントを実行
+cd backend
+uvx ruff format .        # フォーマット実行
+uvx ruff format --check . # フォーマットチェック
+uvx ruff check .         # リントチェック
+```
+
 ### フロントエンドの開発
 
 フロントエンドのコードを変更すると、自動的にリロードされます（Viteのホットリロード有効）。

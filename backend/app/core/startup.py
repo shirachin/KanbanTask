@@ -1,73 +1,87 @@
 """
 Application startup events
 """
+
 from app.core.database import init_db
 
 
 def run_migrations():
     """Run database migrations"""
-    import sys
     import os
+    import sys
+
     # マイグレーションファイルはbackendディレクトリ直下にあるため、パスを追加
     backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     sys.path.insert(0, backend_dir)
-    
+
     try:
         from app.migrations.migrate_add_status_id import migrate
+
         migrate()
     except Exception as e:
         print(f"マイグレーションエラー（無視可能）: {e}")
-    
+
     try:
         from app.migrations.migrate_add_order import migrate as migrate_order
+
         migrate_order()
     except Exception as e:
         print(f"マイグレーションエラー（無視可能）: {e}")
-    
+
     try:
         from app.migrations.migrate_add_project import migrate as migrate_project
+
         migrate_project()
     except Exception as e:
         print(f"プロジェクトマイグレーションエラー（無視可能）: {e}")
-    
+
     try:
         from app.migrations.migrate_add_project_fields import migrate as migrate_project_fields
+
         migrate_project_fields()
     except Exception as e:
         print(f"プロジェクトフィールドマイグレーションエラー（無視可能）: {e}")
-    
+
     try:
         from app.migrations.migrate_add_task_assignee import migrate as migrate_task_assignee
+
         migrate_task_assignee()
     except Exception as e:
         print(f"タスク担当者マイグレーションエラー（無視可能）: {e}")
-    
+
     try:
-        from app.migrations.migrate_add_personal_task_support import migrate as migrate_personal_task
+        from app.migrations.migrate_add_personal_task_support import (
+            migrate as migrate_personal_task,
+        )
+
         migrate_personal_task()
     except Exception as e:
         print(f"個人タスクサポートマイグレーションエラー（無視可能）: {e}")
-    
+
     try:
         from app.migrations.migrate_update_statuses import migrate as migrate_update_statuses
+
         migrate_update_statuses()
     except Exception as e:
         print(f"ステータス更新マイグレーションエラー（無視可能）: {e}")
-    
+
     try:
         from app.migrations.migrate_add_todos import migrate as migrate_add_todos
+
         migrate_add_todos()
     except Exception as e:
         print(f"todosテーブル作成マイグレーションエラー（無視可能）: {e}")
-    
+
     try:
         from app.migrations.migrate_add_todo_dates import migrate as migrate_add_todo_dates
+
         migrate_add_todo_dates()
     except Exception as e:
         print(f"TODO日付カラム追加マイグレーションエラー（無視可能）: {e}")
-    
+
     try:
         from app.migrations.migrate_common_statuses import migrate as migrate_common_statuses
+
         migrate_common_statuses()
     except Exception as e:
         print(f"ステータス共通化マイグレーションエラー（無視可能）: {e}")
@@ -75,26 +89,27 @@ def run_migrations():
 
 def initialize_default_statuses():
     """Initialize common statuses (shared by all projects and personal tasks)"""
+    from app.core.constants import DEFAULT_STATUS_DEFINITIONS
     from app.core.database import SessionLocal
     from app.models import Status
-    from app.core.constants import DEFAULT_STATUS_DEFINITIONS
-    
+
     db = SessionLocal()
     try:
         # 共通ステータスが存在するか確認（project_id IS NULL）
         existing_statuses = db.query(Status).filter(Status.project_id.is_(None)).all()
-        
+
         if not existing_statuses:
             # 共通ステータスが存在しない場合は作成
             for status_data in DEFAULT_STATUS_DEFINITIONS:
-                existing = db.query(Status).filter(
-                    Status.name == status_data["name"],
-                    Status.project_id.is_(None)
-                ).first()
+                existing = (
+                    db.query(Status)
+                    .filter(Status.name == status_data["name"], Status.project_id.is_(None))
+                    .first()
+                )
                 if not existing:
                     status = Status(**status_data, project_id=None)
                     db.add(status)
-            
+
             db.commit()
             print("共通ステータスを初期化しました")
     except Exception as e:
